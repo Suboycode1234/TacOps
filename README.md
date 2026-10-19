@@ -6,10 +6,38 @@ A high-performance, responsive 3D tactical shooter inspired by Counter-Strike, b
 
 ---
 
-## 🚀 Key Features
+## ⚡ Quick Play & Releases
+
+> **Note for Beginners**:
+> It is **much easier to simply go to the [Releases](https://github.com/Suboycode1234/TacOps/releases) section** and download the standalone `Tacops_standalone.html` file!
+> 
+> * **Zero Installation**: Double-click `Tacops_standalone.html` in Windows or open it in any modern browser (Chrome, Edge, Firefox) to play offline immediately.
+> * **Developer Server**: Running locally via `npm run dev` and `index.html` is only recommended for those who know how to run a dev server or want to contribute to the code.
+> * **Distribution Notice**: The standalone HTML file is **NOT provided in the standard GitHub repository source code `.zip`**, it is **only available through GitHub Releases**.
+
+---
+
+## 🐛 Known Bugs & Upcoming Features (Active Tracking)
+
+The following bugs and feature requests are actively prioritized:
+
+- [ ] **Knife Animations & Scale Bug**: Tactical knife model currently loads super oversized and covers map geometry; requires bounding box normalization and scale clamping.
+- [ ] **Falling Out of Map Bug**: Player and bots occasionally fall through collision seam boundaries into the void; requires strict wall bounds collision clamping.
+- [ ] **Terrorist 3rd Person Orientation Bug**: In player 3rd person perspective, Terrorist model is facing backwards (running backwards while moving forward); requires local model yaw coordinate inversion.
+- [ ] **Difficulty to Kill Enemy Bots Bug**: Enemy bot HP and evasion parameters need re-tuning for balanced, enjoyable combat.
+- [ ] **No Reliable GUI Weapon Selection Bug**: Lack of an interactive in-game on-screen GUI to pick and equip available weapons directly.
+- [ ] **Movement Does Not Affect Aim Spread**: Dynamic crosshair bloom and accuracy penalties when sprinting or moving need realistic tuning.
+- [ ] **Bot Over-Movement**: Enemy bots currently move around excessively; requires tactical hold-angle pauses and smoother patrol waypoints.
+- [ ] **Weapon Damage Scaling**: Lack of damage falloff curves over long distances.
+- [ ] **Scoped Weapons Zoom Overlay**: Scoped weapons currently lack specialized optical reticle overlays.
+- [ ] **Hitbox / Body Part Damage Scaling**: Damage is uniform across body; needs distinct multipliers for Headshots (4x), Torso (1x), and Limbs (0.75x).
+
+---
+
+## 🎮 Key Features
 
 - **Authentic Tactical Gunplay**:
-  - Full arsenal including M16A3 Assault Rifle, Desert Eagle .50 AE, P90 Tactical Submachine Gun, and Tactical Combat Knife.
+  - Full arsenal including M16A3 Assault Rifle, Desert Eagle .50 AE, P90 Tactical Submachine Gun, and Tactical Combat Knife with 4-swing combo.
   - Dynamic recoil kick, recovery physics, movement inaccuracy penalty, and Aim Down Sights (ADS) precision zoom.
   - Procedural Web Audio synthesizer generating realistic gunshot transients, mechanical slide actions, dry fires, hitmarkers, headshot dinks, and footsteps.
 - **Counter-Strike Economy & Buy Menu**:
@@ -36,7 +64,7 @@ A high-performance, responsive 3D tactical shooter inspired by Counter-Strike, b
 
 ---
 
-## 🎮 Controls
+## 🕹️ Controls
 
 | Action | Key / Input | Description |
 | :--- | :--- | :--- |
@@ -119,3 +147,10 @@ npm run dev
 ```
 
 Visit `http://127.0.0.1:5173/` in your browser.
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Copyright (c) 2026 Riftbound Studios.
