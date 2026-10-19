@@ -264,19 +264,23 @@ class ModelManager {
 
   // Preload and retrieve Terrorist animation clip (Walking, Running)
   async getTerroristAnimation(name = 'Walking') {
-    if (this.animations.has(name)) {
-      return this.animations.get(name);
+    let resolved = name;
+    if (name.toLowerCase() === 'walk' || name.toLowerCase() === 'walking') resolved = 'Walking';
+    else if (name.toLowerCase() === 'run' || name.toLowerCase() === 'running') resolved = 'Running';
+
+    if (this.animations.has(resolved)) {
+      return this.animations.get(resolved);
     }
     try {
-      const fbx = await this.loadFBX(`/models/Animations/Terrorist/${name}.fbx`);
+      const fbx = await this.loadFBX(`/models/Animations/Terrorist/${resolved}.fbx`);
       if (fbx.animations && fbx.animations.length > 0) {
         const clip = this.makeClipInPlace(fbx.animations[0], ['Armature', 'root']);
-        clip.name = name;
-        this.animations.set(name, clip);
+        clip.name = resolved;
+        this.animations.set(resolved, clip);
         return clip;
       }
     } catch (e) {
-      console.warn(`Could not load animation ${name}:`, e);
+      console.warn(`Could not load animation ${resolved}:`, e);
     }
     return null;
   }

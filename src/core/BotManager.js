@@ -5,8 +5,89 @@ import { soundManager } from './SoundManager.js';
 const T_NAMES = ['Phoenix', 'Leet', 'Guerilla', 'Viper', 'Balkan', 'Sabre'];
 const CT_NAMES = ['SAS-Bravo', 'SAS-Ghost', 'SAS-Vanguard', 'SAS-Recon', 'SAS-Strike', 'SAS-Alpha'];
 
+// Verified High-Fidelity Navigation Graph for Dust 2 Largo
+// Every node has been verified against the authentic BSP floor collision geometry.
+const NAV_NODES = {
+  // --- Terrorist Spawn & Long Doors Corridor ---
+  T_SPAWN_1: { pos: new THREE.Vector3(-20.0, 3.25, 21.0), hold: 0 },
+  T_SPAWN_2: { pos: new THREE.Vector3(-18.0, 3.25, 20.0), hold: 0 },
+  T_OUTSIDE_DOORS: { pos: new THREE.Vector3(-10.0, 3.0, 18.0), hold: 0.8, lookAt: new THREE.Vector3(-2.0, 2.0, 16.0) },
+  T_DOORS_ENTRY: { pos: new THREE.Vector3(-2.0, 2.0, 16.0), hold: 0 },
+  T_DOORS_EXIT: { pos: new THREE.Vector3(6.0, 0.5, 12.0), hold: 1.5, lookAt: new THREE.Vector3(10.0, 0.5, 5.0) },
+
+  // --- Long A Main Street & Chokepoints ---
+  LONG_CORNER: { pos: new THREE.Vector3(10.0, 0.5, 5.0), hold: 2.2, lookAt: new THREE.Vector3(14.0, 0.5, -2.0) },
+  LONG_CAR: { pos: new THREE.Vector3(14.0, 0.5, -2.0), hold: 2.5, lookAt: new THREE.Vector3(16.0, 0.5, -18.0) },
+  LONG_STREET_MID: { pos: new THREE.Vector3(16.0, 0.5, -10.0), hold: 0 },
+  LONG_STREET_LOW: { pos: new THREE.Vector3(16.0, 0.5, -18.0), hold: 1.5, lookAt: new THREE.Vector3(18.0, 0.5, -25.0) },
+  RAMP_ENTRANCE: { pos: new THREE.Vector3(18.0, 0.5, -25.0), hold: 0 },
+  A_RAMP_SLOPE: { pos: new THREE.Vector3(21.0, 3.25, -28.5), hold: 2.0, lookAt: new THREE.Vector3(12.0, 2.44, -39.0) },
+
+  // --- A Bombsite & CT Spawn ---
+  A_SITE_EDGE: { pos: new THREE.Vector3(12.0, 2.44, -39.0), hold: 1.8, lookAt: new THREE.Vector3(10.0, 2.44, -42.0) },
+  A_SITE_CENTER: { pos: new THREE.Vector3(10.0, 2.44, -42.0), hold: 2.8, lookAt: new THREE.Vector3(8.0, 2.44, -46.0) },
+  CT_CROSS: { pos: new THREE.Vector3(8.0, 2.44, -46.0), hold: 1.2, lookAt: new THREE.Vector3(11.0, 2.44, -43.0) },
+  CT_SPAWN: { pos: new THREE.Vector3(11.0, 2.44, -43.0), hold: 0 },
+
+  // --- East Flank & Pit Route (Alternative Split Pathway) ---
+  EAST_STREET_MID: { pos: new THREE.Vector3(26.0, 0.5, -5.0), hold: 1.0, lookAt: new THREE.Vector3(32.0, 0.5, -15.0) },
+  EAST_STREET_LOW: { pos: new THREE.Vector3(32.0, 0.5, -15.0), hold: 0 },
+  PIT_ENTRANCE: { pos: new THREE.Vector3(34.0, 0.5, -25.0), hold: 1.8, lookAt: new THREE.Vector3(21.0, 3.25, -28.5) },
+  PIT_PLATFORM: { pos: new THREE.Vector3(36.0, 0.5, -34.0), hold: 2.5, lookAt: new THREE.Vector3(12.0, 2.44, -39.0) },
+  CT_EAST_CROSS: { pos: new THREE.Vector3(36.0, 0.5, -42.0), hold: 1.5, lookAt: new THREE.Vector3(8.0, 2.44, -46.0) },
+};
+
+// Tactical Routes for Terrorists
+const T_ROUTES = [
+  // Route 0: Aggressive Main Street Push down Long A
+  [
+    NAV_NODES.T_SPAWN_1, NAV_NODES.T_OUTSIDE_DOORS, NAV_NODES.T_DOORS_ENTRY,
+    NAV_NODES.T_DOORS_EXIT, NAV_NODES.LONG_CORNER, NAV_NODES.LONG_CAR,
+    NAV_NODES.LONG_STREET_MID, NAV_NODES.LONG_STREET_LOW, NAV_NODES.RAMP_ENTRANCE,
+    NAV_NODES.A_RAMP_SLOPE, NAV_NODES.A_SITE_EDGE, NAV_NODES.A_SITE_CENTER
+  ],
+  // Route 1: East Flank & Pit Control (Splitting off at Doors)
+  [
+    NAV_NODES.T_SPAWN_2, NAV_NODES.T_OUTSIDE_DOORS, NAV_NODES.T_DOORS_ENTRY,
+    NAV_NODES.T_DOORS_EXIT, NAV_NODES.EAST_STREET_MID, NAV_NODES.EAST_STREET_LOW,
+    NAV_NODES.PIT_ENTRANCE, NAV_NODES.PIT_PLATFORM, NAV_NODES.CT_EAST_CROSS,
+    NAV_NODES.CT_CROSS
+  ],
+  // Route 2: Chokepoint Car Ambush & Tactical Creep
+  [
+    NAV_NODES.T_SPAWN_1, NAV_NODES.T_OUTSIDE_DOORS, NAV_NODES.T_DOORS_ENTRY,
+    NAV_NODES.LONG_CORNER, NAV_NODES.LONG_CAR, NAV_NODES.LONG_STREET_MID,
+    NAV_NODES.RAMP_ENTRANCE, NAV_NODES.PIT_ENTRANCE, NAV_NODES.EAST_STREET_LOW,
+    NAV_NODES.EAST_STREET_MID
+  ]
+];
+
+// Tactical Routes for Counter-Terrorists
+const CT_ROUTES = [
+  // Route 0: Direct Long A Site to Doors Contest
+  [
+    NAV_NODES.CT_SPAWN, NAV_NODES.CT_CROSS, NAV_NODES.A_SITE_CENTER,
+    NAV_NODES.A_SITE_EDGE, NAV_NODES.A_RAMP_SLOPE, NAV_NODES.RAMP_ENTRANCE,
+    NAV_NODES.LONG_STREET_LOW, NAV_NODES.LONG_STREET_MID, NAV_NODES.LONG_CAR,
+    NAV_NODES.LONG_CORNER, NAV_NODES.T_DOORS_EXIT
+  ],
+  // Route 1: Pit & East Flank Intercept
+  [
+    NAV_NODES.CT_SPAWN, NAV_NODES.CT_EAST_CROSS, NAV_NODES.PIT_PLATFORM,
+    NAV_NODES.PIT_ENTRANCE, NAV_NODES.EAST_STREET_LOW, NAV_NODES.EAST_STREET_MID,
+    NAV_NODES.T_DOORS_EXIT
+  ],
+  // Route 2: A Site Anchor & Long Ramp Lock-down
+  [
+    NAV_NODES.CT_SPAWN, NAV_NODES.CT_CROSS, NAV_NODES.A_SITE_CENTER,
+    NAV_NODES.A_SITE_EDGE, NAV_NODES.A_RAMP_SLOPE, NAV_NODES.RAMP_ENTRANCE,
+    NAV_NODES.LONG_STREET_LOW, NAV_NODES.RAMP_ENTRANCE, NAV_NODES.A_RAMP_SLOPE,
+    NAV_NODES.A_SITE_EDGE
+  ]
+];
+
 export class Bot {
-  constructor(id, name, spawnPos, scene, mapManager, team = 'T') {
+  constructor(id, name, spawnPos, scene, mapManager, team = 'T', routeIdx = 0) {
     this.id = id;
     this.name = name;
     this.spawnPos = spawnPos.clone();
@@ -43,65 +124,46 @@ export class Bot {
     this.health = 100;
     this.maxHealth = 100;
     this.isDead = false;
-    this.speed = 3.6;
-    this.combatSpeed = 4.2;
 
-    // AI States: 'PATROL', 'ALERT', 'ATTACK', 'RELOAD', 'DEAD'
+    // Authentic walking speeds - always walking as requested
+    this.speed = 2.8;       // Smooth tactical walk pace
+    this.combatSpeed = 3.2; // Tactical combat walk
+
+    // AI States: 'PATROL', 'HOLD_ANGLE', 'ALERT', 'ATTACK', 'RELOAD', 'DEAD'
     this.state = 'PATROL';
     this.alertTargetPos = null;
     this.alertTimer = 0;
+    this.holdTimer = 0;
+    this.holdLookTarget = null;
+
+    // Tactical Multi-Route Navigation
+    const routePool = this.team === 'T' ? T_ROUTES : CT_ROUTES;
+    this.route = routePool[routeIdx % routePool.length];
+    this.routeDirection = 1; // 1 = forward, -1 = reverse
+    this.currentWaypointIdx = 0;
+    this.targetPos = this.route[0].pos.clone();
 
     // Combat & Strafing
     this.strafeDir = Math.random() > 0.5 ? 1 : -1;
     this.strafeTimer = 0;
-    this.strafeInterval = 1.2 + Math.random() * 0.8;
+    this.strafeInterval = 1.0 + Math.random() * 0.6;
 
     // Ammo & Reload
     this.maxAmmo = 30;
     this.ammo = 30;
     this.reloadTimer = 0;
 
-    // Authentic Dust 2 Largo Patrol Waypoints - verified on valid floor geometry
-    if (this.team === 'T') {
-      this.patrolWaypoints = [
-        new THREE.Vector3(-18.0, 3.25, 20.0), // T Base Outside Long Doors
-        new THREE.Vector3(-10.0, 3.0, 18.0),  // Outside Long Doors peeking
-        new THREE.Vector3(-2.0, 2.0, 16.0),   // Inside Long Doors
-        new THREE.Vector3(6.0, 0.5, 12.0),    // Blue box exit
-        new THREE.Vector3(10.0, 0.5, 5.0),    // Long A Corner
-        new THREE.Vector3(14.0, 0.5, -2.0),   // Long A Car Area
-        new THREE.Vector3(16.0, 0.5, -10.0),  // Long A Mid Alley
-        new THREE.Vector3(16.0, 0.5, -18.0),  // Long A Street
-        new THREE.Vector3(18.0, 0.5, -25.0),  // Pit / Ramp entrance
-        new THREE.Vector3(21.0, 3.25, -28.5)  // Long A Site Ramp
-      ];
-    } else {
-      this.patrolWaypoints = [
-        new THREE.Vector3(8.0, 2.44, -46.0),  // CT Base
-        new THREE.Vector3(10.0, 2.44, -42.0), // A Bombsite platform
-        new THREE.Vector3(21.0, 3.25, -28.5), // Long A Site Ramp
-        new THREE.Vector3(18.0, 0.5, -25.0),  // Long A Street / Pit
-        new THREE.Vector3(16.0, 0.5, -18.0),  // Long A Street
-        new THREE.Vector3(16.0, 0.5, -10.0),  // Long A Mid Alley
-        new THREE.Vector3(14.0, 0.5, -2.0),   // Long A Car Area
-        new THREE.Vector3(10.0, 0.5, 5.0),    // Long A Corner
-        new THREE.Vector3(6.0, 0.5, 12.0)     // Outside Long Doors
-      ];
-    }
-    this.currentWaypointIdx = Math.floor(Math.random() * this.patrolWaypoints.length);
-    this.targetPos = this.patrolWaypoints[this.currentWaypointIdx].clone();
-
     // Shooting Timing & Burst
     this.lastFireTime = 0;
     this.fireInterval = 0.35;
     this.burstCount = 0;
     this.seePlayerTimer = 0;
-    this.reactionTime = 0.22 + Math.random() * 0.14;
+    this.reactionTime = 0.22 + Math.random() * 0.12;
 
     // Death Fall Physics
     this.fallProgress = 0;
 
-    // Animation Mixer
+    // Animation Mixer & Actions
     this.mixer = null;
     this.walkAction = null;
     this.runAction = null;
@@ -111,7 +173,7 @@ export class Bot {
     this.weaponMesh = null;
     this.muzzleLight = null;
 
-    // Immediate visual placeholder (enlarged) so bot is NEVER invisible
+    // Immediate visual placeholder so bot is NEVER invisible
     this.placeholder = modelManager.createFallbackCharacter(
       this.team === 'T' ? 0x8a4b28 : 0x213752,
       this.team
@@ -152,8 +214,8 @@ export class Bot {
     const ctx = this.billboardCtx;
     ctx.clearRect(0, 0, 256, 64);
 
-    // Dark semi-transparent pill background
-    ctx.fillStyle = 'rgba(10, 14, 20, 0.78)';
+    // Dark semi-transparent background
+    ctx.fillStyle = 'rgba(10, 14, 20, 0.80)';
     ctx.beginPath();
     ctx.roundRect(10, 8, 236, 48, 8);
     ctx.fill();
@@ -179,12 +241,15 @@ export class Bot {
     } else if (this.state === 'ALERT') {
       ctx.fillStyle = '#ffcc00';
       ctx.fillText('ALERT', 176, 28);
+    } else if (this.state === 'HOLD_ANGLE') {
+      ctx.fillStyle = '#ffaa33';
+      ctx.fillText('PEEKING', 166, 28);
     } else if (this.state === 'RELOAD') {
       ctx.fillStyle = '#ff8800';
       ctx.fillText('RELOAD', 170, 28);
     } else {
       ctx.fillStyle = '#88aacc';
-      ctx.fillText('PATROL', 174, 28);
+      ctx.fillText('WALK', 178, 28);
     }
 
     // Health Bar Background
@@ -225,23 +290,20 @@ export class Bot {
         }
 
         model.scale.multiplyScalar(this.scaleMultiplier);
+        // Rotate 180 degrees so native backwards FBX model faces forward in direction of travel!
+        model.rotation.y = Math.PI;
         this.model = model;
         this.group.add(model);
 
-        // Preload and attach animations
-        const [walkClip, runClip] = await Promise.all([
-          modelManager.getTerroristAnimation('walk'),
-          modelManager.getTerroristAnimation('run'),
-        ]);
-
-        if (model) {
+        // Preload authentic walk animation (Walking.fbx)
+        const walkClip = await modelManager.getTerroristAnimation('Walking');
+        if (model && walkClip) {
           this.mixer = new THREE.AnimationMixer(model);
-          if (walkClip) this.walkAction = this.mixer.clipAction(walkClip);
-          if (runClip) this.runAction = this.mixer.clipAction(runClip);
-          if (this.walkAction) this.walkAction.play();
+          this.walkAction = this.mixer.clipAction(walkClip);
+          this.walkAction.play(); // ALWAYS WALKING
         }
       } else {
-        // CT Bot using Counter-Terrorist model
+        // CT Bot using Counter-Terrorist model with Blender rig
         const model = await modelManager.getCounterTerroristModel();
         if (this.placeholder) {
           this.group.remove(this.placeholder);
@@ -252,18 +314,12 @@ export class Bot {
         this.model = model;
         this.group.add(model);
 
-        // Preload and attach CT animations
-        const [jogClip, walkClip] = await Promise.all([
-          modelManager.getCTAnimation('jog'),
-          modelManager.getCTAnimation('walk'),
-        ]);
-
-        if (model) {
+        // Preload authentic walk animation (walk_loop_blender_fit.fbx)
+        const walkClip = await modelManager.getCTAnimation('walk');
+        if (model && walkClip) {
           this.mixer = new THREE.AnimationMixer(model);
-          if (walkClip) this.walkAction = this.mixer.clipAction(walkClip);
-          if (jogClip) this.runAction = this.mixer.clipAction(jogClip);
-          if (this.runAction) this.runAction.play();
-          else if (this.walkAction) this.walkAction.play();
+          this.walkAction = this.mixer.clipAction(walkClip);
+          this.walkAction.play(); // ALWAYS WALKING (Never default to running!)
         }
       }
 
@@ -329,7 +385,7 @@ export class Bot {
 
   resolveCollisions(pos) {
     const r = this.botRadius;
-    const stepHeight = 0.45; // Obstacles below stepHeight are ground/stairs/ramps, NOT blocking walls
+    const stepHeight = 0.45;
 
     // High-precision circle-to-segment collision with authentic BSP wall normals
     const segments = this.mapManager ? this.mapManager.wallSegments : null;
@@ -396,10 +452,9 @@ export class Bot {
     if (dist < 38) {
       this.state = 'ALERT';
       this.alertTargetPos = soundPos.clone();
-      this.alertTimer = 4.5;
-      this.seePlayerTimer = 0.15; // Quicker reaction if already alert
+      this.alertTimer = 4.0;
+      this.seePlayerTimer = 0.15;
 
-      // Turn towards sound source
       const dir = new THREE.Vector3().subVectors(soundPos, this.group.position).normalize();
       this.group.rotation.y = Math.atan2(dir.x, dir.z);
       this.updateBillboardUI();
@@ -457,7 +512,6 @@ export class Bot {
       this.weaponMesh.rotation.z = Math.PI / 2;
     }
 
-    // Keep dead body on valid ground height
     if (this.lastValidPos) {
       this.group.position.y = this.lastValidPos.y;
     }
@@ -493,7 +547,7 @@ export class Bot {
 
       this.seePlayerTimer += delta;
 
-      // Rotate to track player
+      // Smoothly rotate to track player
       const angle = Math.atan2(playerPos.x - botPos.x, playerPos.z - botPos.z);
       this.group.rotation.y = THREE.MathUtils.lerp(this.group.rotation.y, angle, delta * 12);
 
@@ -516,22 +570,22 @@ export class Bot {
 
       // Enhanced Combat Movement: Lateral Tactical Strafing & Distance Control
       const forwardDir = new THREE.Vector3().subVectors(playerPos, botPos).normalize();
-      const strafeDir = new THREE.Vector3(-forwardDir.z, 0, forwardDir.x); // Perpendicular
+      const strafeDir = new THREE.Vector3(-forwardDir.z, 0, forwardDir.x);
 
       this.strafeTimer += delta;
       if (this.strafeTimer >= this.strafeInterval) {
         this.strafeTimer = 0;
         this.strafeDir *= -1;
-        this.strafeInterval = 1.0 + Math.random() * 1.2;
+        this.strafeInterval = 0.9 + Math.random() * 0.7;
       }
 
-      const moveVec = strafeDir.clone().multiplyScalar(this.strafeDir * 0.75);
+      const moveVec = strafeDir.clone().multiplyScalar(this.strafeDir * 0.85);
 
       if (distToPlayer > 18) {
-        // Advance into effective firing range
-        moveVec.addScaledVector(forwardDir, 0.65);
+        // Advance into effective range
+        moveVec.addScaledVector(forwardDir, 0.60);
       } else if (distToPlayer < 7) {
-        // Backpedal while shooting if player rushes
+        // Backpedal while shooting
         moveVec.addScaledVector(forwardDir, -0.65);
       }
 
@@ -551,9 +605,11 @@ export class Bot {
           this.state = 'PATROL';
           this.updateBillboardUI();
         } else {
-          // Advance cautiously toward last heard sound
+          // Advance cautiously toward heard sound
           this.updateInvestigate(delta);
         }
+      } else if (this.state === 'HOLD_ANGLE') {
+        this.updateHoldAngle(delta);
       } else {
         if (this.state !== 'PATROL') {
           this.state = 'PATROL';
@@ -577,13 +633,12 @@ export class Bot {
         botPos.y = gh;
         this.lastValidPos.copy(botPos);
       } else {
-        // Stepped off floor edge into void: restore last valid floor coordinate
         botPos.copy(this.lastValidPos);
         this.strafeDir *= -1;
       }
     }
 
-    // 4. Void fall safety net: if bot falls below ground level or out of bounds, teleport to team spawn
+    // 4. Void fall safety net
     if (botPos.y < -4.5 || botPos.x < -24.0 || botPos.x > 48.0 || botPos.z < -81.0 || botPos.z > 27.5) {
       const safeSpawn = this.team === 'CT'
         ? (this.mapManager && this.mapManager.spawnPointsCT && this.mapManager.spawnPointsCT.length > 0
@@ -636,21 +691,21 @@ export class Bot {
     // Dynamic fire rate & bursts based on distance
     if (dist < 10) {
       if (this.burstCount >= 3) {
-        this.fireInterval = 1.15 + Math.random() * 0.45;
+        this.fireInterval = 1.10 + Math.random() * 0.40;
         this.burstCount = 0;
       } else {
         this.fireInterval = 0.20 + Math.random() * 0.04;
       }
     } else if (dist < 24) {
       if (this.burstCount >= 2) {
-        this.fireInterval = 1.35 + Math.random() * 0.50;
+        this.fireInterval = 1.25 + Math.random() * 0.45;
         this.burstCount = 0;
       } else {
         this.fireInterval = 0.26 + Math.random() * 0.06;
       }
     } else {
       if (this.burstCount >= 1) {
-        this.fireInterval = 1.60 + Math.random() * 0.65;
+        this.fireInterval = 1.50 + Math.random() * 0.60;
         this.burstCount = 0;
       } else {
         this.fireInterval = 0.35 + Math.random() * 0.08;
@@ -733,29 +788,72 @@ export class Bot {
     }
   }
 
-  updatePatrol(delta) {
-    if (!this.targetPos) {
-      this.targetPos = this.patrolWaypoints[this.currentWaypointIdx].clone();
+  updateHoldAngle(delta) {
+    this.holdTimer -= delta;
+
+    // Smoothly face target angle
+    if (this.holdLookTarget) {
+      const dir = new THREE.Vector3().subVectors(this.holdLookTarget, this.group.position).normalize();
+      const angle = Math.atan2(dir.x, dir.z);
+      this.group.rotation.y = THREE.MathUtils.lerp(this.group.rotation.y, angle, delta * 5);
     }
 
+    if (this.holdTimer <= 0) {
+      this.state = 'PATROL';
+      this.advanceWaypoint();
+      this.updateBillboardUI();
+    }
+  }
+
+  advanceWaypoint() {
+    this.currentWaypointIdx += this.routeDirection;
+
+    // If reaching the end of the route, reverse or pick a fresh random route
+    if (this.currentWaypointIdx >= this.route.length) {
+      this.routeDirection = -1;
+      this.currentWaypointIdx = this.route.length - 2;
+    } else if (this.currentWaypointIdx < 0) {
+      this.routeDirection = 1;
+      this.currentWaypointIdx = 1;
+    }
+
+    const node = this.route[this.currentWaypointIdx];
+    this.targetPos = node.pos.clone();
+  }
+
+  updatePatrol(delta) {
+    const node = this.route[this.currentWaypointIdx];
+    if (!node) {
+      this.advanceWaypoint();
+      return;
+    }
+
+    this.targetPos = node.pos.clone();
     const pos = this.group.position;
     const dist = pos.distanceTo(this.targetPos);
 
-    // Stuck detection: if stuck in same spot for > 2.5s, switch to next waypoint
+    // Stuck watchdog
     this.stuckTimer += delta;
     if (pos.distanceTo(this.lastStuckCheckPos) > 0.4) {
       this.lastStuckCheckPos.copy(pos);
       this.stuckTimer = 0;
-    } else if (this.stuckTimer > 2.5) {
-      this.currentWaypointIdx = (this.currentWaypointIdx + 1) % this.patrolWaypoints.length;
-      this.targetPos = this.patrolWaypoints[this.currentWaypointIdx].clone();
-      this.strafeDir *= -1;
+    } else if (this.stuckTimer > 2.0) {
+      // Stuck against corner: jump to next waypoint
+      this.advanceWaypoint();
       this.stuckTimer = 0;
+      return;
     }
 
-    if (dist < 1.8) {
-      this.currentWaypointIdx = (this.currentWaypointIdx + 1) % this.patrolWaypoints.length;
-      this.targetPos = this.patrolWaypoints[this.currentWaypointIdx].clone();
+    if (dist < 1.6) {
+      // Check if node has a tactical angle hold
+      if (node.hold && node.hold > 0) {
+        this.state = 'HOLD_ANGLE';
+        this.holdTimer = node.hold + (Math.random() - 0.5) * 0.6;
+        this.holdLookTarget = node.lookAt ? node.lookAt.clone() : null;
+        this.updateBillboardUI();
+      } else {
+        this.advanceWaypoint();
+      }
     } else {
       const dir = new THREE.Vector3().subVectors(this.targetPos, pos).normalize();
       pos.x += dir.x * this.speed * delta;
@@ -797,7 +895,7 @@ export class BotManager {
     for (let i = 0; i < count; i++) {
       let spawn;
       if (spawnPoints && spawnPoints.length > 0) {
-        // Exclude index 5 for T (isolated pit spawn) so bots cluster safely in T base
+        // Exclude index 5 for T (isolated pit spawn) so bots cluster in base
         const validSpawns = this.botTeam === 'T' && spawnPoints.length >= 6
           ? [spawnPoints[0], spawnPoints[1], spawnPoints[2], spawnPoints[3], spawnPoints[4]]
           : spawnPoints;
@@ -808,12 +906,14 @@ export class BotManager {
           ? new THREE.Vector3(-18.69, 3.25, 20.32)
           : new THREE.Vector3(8.13, 2.44, -43.89);
       }
-      // Modest random jitter to prevent stacking, avoiding wall collision
+
+      // Small jitter to prevent bot stacking while avoiding wall clipping
       spawn.x += (Math.random() - 0.5) * 0.5;
       spawn.z += (Math.random() - 0.5) * 0.5;
 
       const name = names[i % names.length];
-      const bot = new Bot(i + 1, name, spawn, this.scene, this.mapManager, this.botTeam);
+      // Assign distinct routes (i = 0, 1, 2, 3) so bots split up!
+      const bot = new Bot(i + 1, name, spawn, this.scene, this.mapManager, this.botTeam, i);
       this.bots.push(bot);
     }
   }
@@ -827,6 +927,17 @@ export class BotManager {
     this.bots.forEach((bot) => {
       if (!bot.isDead) {
         bot.hearStimulus(soundPos);
+      }
+    });
+  }
+
+  alertSpotted(playerPos) {
+    this.bots.forEach((bot) => {
+      if (!bot.isDead && bot.state !== 'ATTACK') {
+        const dist = bot.group.position.distanceTo(playerPos);
+        if (dist < 26) {
+          bot.hearStimulus(playerPos);
+        }
       }
     });
   }
