@@ -11,7 +11,7 @@ const outDir = 'H:\\TacopsBackup';
 if (!fs.existsSync(outDir)) {
   fs.mkdirSync(outDir, { recursive: true });
 }
-const outFile = path.join(outDir, 'index.html');
+const outFile = path.join(outDir, 'Tacops_standalone.html');
 
 console.log('1. Building production bundle with Vite...');
 execSync('npm.cmd run build', { cwd: projectRoot, stdio: 'inherit' });
