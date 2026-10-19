@@ -6,7 +6,7 @@
     slot: 3,
     price: 0,
     damage: 55,
-    backstabMultiplier: 2.2, // Lethal 121+ dmg backstab
+    backstabMultiplier: 2.36, // Lethal 130 dmg backstab
     headshotMultiplier: 1.5,
     fireRate: 2.2,
     isAutomatic: false,
@@ -18,7 +18,7 @@
     spreadMovePenalty: 0.0,
     recoil: 0.005,
     recoilRecovery: 10.0,
-    mobility: 1.05,
+    mobility: 1.28,
     sound: 'playKnifeSlash',
     hitSound: 'playKnifeHit',
     modelPath: '/models/Guns/Knife/Animations/Idle/source/arms@knife_idle.fbx',

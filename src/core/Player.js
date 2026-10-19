@@ -420,6 +420,7 @@ export class Player {
           if (anims.idle) {
             this.knifeActions.idle = this.knifeMixer.clipAction(anims.idle);
             this.knifeActions.idle.play();
+            this.currentKnifeAction = this.knifeActions.idle;
           }
           ['swing1', 'swing2', 'swing3', 'swing4'].forEach(sw => {
             if (anims[sw]) {
@@ -430,16 +431,21 @@ export class Player {
             }
           });
 
-          // When swing finishes, return to idle animation
+          // When swing finishes, smoothly return to idle animation
           this.knifeMixer.addEventListener('finished', (e) => {
             if (this.knifeActions && this.knifeActions.idle) {
+              if (e.action && e.action !== this.knifeActions.idle) {
+                e.action.fadeOut(0.12);
+              }
               this.knifeActions.idle.reset().fadeIn(0.12).play();
+              this.currentKnifeAction = this.knifeActions.idle;
             }
           });
         }
       } else {
         this.knifeMixer = null;
         this.knifeActions = {};
+        this.currentKnifeAction = null;
       }
     }
 
@@ -526,24 +532,26 @@ export class Player {
 
     if (this.activeWeapon.id === 'knife') {
       this.lastShootTime = now;
-      if (now - this.knifeLastClickTime > 3000) {
+      if (now - this.knifeLastClickTime > 1800) {
         this.knifeComboIndex = 0;
       }
       this.knifeLastClickTime = now;
 
-      // Play combo swing
+      // Play combo swing with seamless bridging and zero delay
       const swingKey = 'swing' + (this.knifeComboIndex + 1);
       const action = this.knifeActions && this.knifeActions[swingKey];
       if (action) {
-        ['swing1', 'swing2', 'swing3', 'swing4'].forEach(k => {
-          if (this.knifeActions[k] && this.knifeActions[k] !== action) {
-            this.knifeActions[k].stop();
-          }
-        });
-        if (this.knifeActions.idle) {
+        if (this.currentKnifeAction && this.currentKnifeAction !== action) {
+          this.currentKnifeAction.fadeOut(0.06);
+        }
+        if (this.knifeActions.idle && this.knifeActions.idle !== action) {
           this.knifeActions.idle.fadeOut(0.06);
         }
-        action.reset().fadeIn(0.04).play();
+        action.reset();
+        action.setEffectiveTimeScale(swingKey === 'swing4' ? 1.55 : 1.35);
+        action.fadeIn(0.02); // Snappy instant trigger
+        action.play();
+        this.currentKnifeAction = action;
       }
       this.knifeComboIndex = (this.knifeComboIndex + 1) % 4;
 
@@ -614,7 +622,7 @@ export class Player {
     );
     raycaster.setFromCamera(screenCenter, this.camera);
     if (isKnife) {
-      raycaster.far = this.activeWeapon.range || 2.8;
+      raycaster.far = this.activeWeapon.range || 3.25;
     }
 
     if (this.onShoot) {
@@ -705,7 +713,7 @@ export class Player {
     // Default: Walking speed (4.3 m/s). Shift activates Running (7.6 m/s). Crouch is 1.9 m/s.
     let baseSpeed = this.isRunning ? 7.6 : 4.3;
     if (this.activeWeapon) baseSpeed *= this.activeWeapon.mobility || 1.0;
-    if (this.isCrouching) baseSpeed = 1.9;
+    if (this.isCrouching) baseSpeed = (this.activeWeapon && this.activeWeapon.id === 'knife') ? 2.4 : 1.9;
 
     const targetHeight = this.isCrouching ? this.crouchHeight : this.standHeight;
     this.currentHeight = THREE.MathUtils.lerp(this.currentHeight, targetHeight, delta * 12);
@@ -784,7 +792,7 @@ export class Player {
     // Update knife viewmodel animations
     if (this.knifeMixer) {
       this.knifeMixer.update(delta);
-      if (this.knifeComboIndex > 0 && performance.now() - this.knifeLastClickTime > 3000) {
+      if (this.knifeComboIndex > 0 && performance.now() - this.knifeLastClickTime > 1800) {
         this.knifeComboIndex = 0;
       }
     }

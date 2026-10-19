@@ -103,75 +103,121 @@ export class Game {
         ...mapMeshes,
       ], true);
 
+      let hitBot = null;
+      let hitPart = 'body';
+      let hitMultiplier = 1.0;
+      let hitPoint = null;
+      let isHeadshot = false;
+
+      // 1. Direct raycast hit on bot
+      if (allIntersects.length > 0) {
+        for (let i = 0; i < allIntersects.length; i++) {
+          const item = allIntersects[i];
+          if (item.object && item.object.userData && item.object.userData.bot && !item.object.userData.bot.isDead) {
+            hitBot = item.object.userData.bot;
+            hitPart = item.object.userData.part || 'body';
+            isHeadshot = hitPart === 'head';
+            hitMultiplier = item.object.userData.multiplier || 1.0;
+            hitPoint = item.point;
+            break;
+          }
+          if (weapon.category !== 'melee') break;
+        }
+      }
+
+      // 2. If melee and direct ray didn't hit bot, perform authentic melee sweep in front of player
+      if (weapon.category === 'melee' && !hitBot) {
+        const playerEye = this.player.camera.getWorldPosition(new THREE.Vector3());
+        let closestDist = Infinity;
+        const meleeReach = 3.25;
+
+        for (const bot of this.botManager.bots) {
+          if (bot.isDead) continue;
+          const botTorso = bot.group.position.clone();
+          botTorso.y += 1.35;
+
+          const dist = playerEye.distanceTo(botTorso);
+          if (dist <= meleeReach) {
+            const toBot = new THREE.Vector3().subVectors(botTorso, playerEye).normalize();
+            const dot = camDir.dot(toBot);
+            // Within ~65-degree forward striking arc
+            if (dot > 0.42 && dist < closestDist) {
+              closestDist = dist;
+              hitBot = bot;
+              hitPart = 'body';
+              isHeadshot = false;
+              hitMultiplier = 1.0;
+              hitPoint = botTorso;
+            }
+          }
+        }
+      }
+
+      // 3. Process bot hit
+      if (hitBot) {
+        let finalDamage = Math.round(weapon.damage * hitMultiplier);
+
+        if (weapon.category === 'melee') {
+          // Check lethal backstab angle
+          const playerDir = new THREE.Vector3();
+          this.player.camera.getWorldDirection(playerDir);
+          playerDir.y = 0;
+          playerDir.normalize();
+
+          const botDir = new THREE.Vector3();
+          hitBot.group.getWorldDirection(botDir);
+          botDir.y = 0;
+          botDir.normalize();
+
+          const dot = playerDir.dot(botDir);
+          if (dot > 0.35) {
+            finalDamage = 130; // Fatal backstab!
+          }
+        }
+
+        if (isHeadshot) {
+          soundManager.playHeadshotDink();
+          this.fxManager.createHeadshotSparks(hitPoint || hitBot.group.position);
+        } else {
+          if (weapon.category === 'melee') {
+            soundManager.playKnifeHit();
+          } else {
+            soundManager.playHitmarker();
+          }
+          this.fxManager.createBloodImpact(hitPoint || hitBot.group.position);
+        }
+
+        const remHp = hitBot.takeDamage(finalDamage, isHeadshot, 'Player');
+
+        if (remHp <= 0) {
+          const reward = weapon.category === 'melee' ? 1500 : 300;
+          this.player.money = Math.min(16000, this.player.money + reward);
+          if (this.onKillFeed) {
+            this.onKillFeed({
+              killer: 'Player',
+              victim: hitBot.name,
+              weapon: weapon.name,
+              isHeadshot: isHeadshot,
+            });
+          }
+          this.checkRoundStatus();
+        }
+        return;
+      }
+
+      // 4. Otherwise handle targets, walls, and misses
       if (allIntersects.length > 0) {
         const hit = allIntersects[0];
         const hitPoint = hit.point;
 
-        if (weapon.category !== 'melee') {
-          this.fxManager.createTracer(muzzlePos, hitPoint);
-        }
-
-        // 1. Check if hit Bot Hitbox
-        if (hit.object.userData && hit.object.userData.bot) {
-          const bot = hit.object.userData.bot;
-          const isHeadshot = hit.object.userData.part === 'head';
-          const multiplier = hit.object.userData.multiplier || 1.0;
-          let finalDamage = Math.round(weapon.damage * multiplier);
-
-          if (weapon.category === 'melee') {
-            // Melee range check: maximum reach 3.0 meters
-            const dist = this.player.yawObject.position.distanceTo(bot.group.position);
-            if (dist > 3.0) return; // Beyond knife range
-
-            // Check lethal backstab angle
-            const playerDir = new THREE.Vector3();
-            this.player.yawObject.getWorldDirection(playerDir);
-            const botDir = new THREE.Vector3();
-            bot.group.getWorldDirection(botDir);
-            const dot = playerDir.dot(botDir);
-            if (dot > 0.35) {
-              finalDamage = 125; // Fatal backstab!
-            }
-          }
-
-          if (isHeadshot) {
-            soundManager.playHeadshotDink();
-            this.fxManager.createHeadshotSparks(hitPoint);
-          } else {
-            if (weapon.category === 'melee') {
-              soundManager.playKnifeHit();
-            } else {
-              soundManager.playHitmarker();
-            }
-            this.fxManager.createBloodImpact(hitPoint);
-          }
-
-          const remHp = bot.takeDamage(finalDamage, isHeadshot, 'Player');
-
-          if (remHp <= 0) {
-            const reward = weapon.category === 'melee' ? 1500 : 300;
-            this.player.money = Math.min(16000, this.player.money + reward);
-            if (this.onKillFeed) {
-              this.onKillFeed({
-                killer: 'Player',
-                victim: bot.name,
-                weapon: weapon.name,
-                isHeadshot: isHeadshot,
-              });
-            }
-            this.checkRoundStatus();
-          }
-        }
-        // 2. Interactive Range Target
-        else if (hit.object.name === 'Target_Bullseye') {
+        if (hit.object.name === 'Target_Bullseye') {
           const targetGroup = hit.object.parent;
           this.mapManager.hitTarget(targetGroup);
           soundManager.playHitmarker();
           this.fxManager.createSparkImpact(hitPoint, hit.face ? hit.face.normal : new THREE.Vector3(0, 1, 0));
-        }
-        // 3. Wall / ground / crate impact
-        else {
+        } else {
           if (weapon.category !== 'melee') {
+            this.fxManager.createTracer(muzzlePos, hitPoint);
             soundManager.playImpactWall();
             const norm = hit.face ? hit.face.normal : new THREE.Vector3(0, 1, 0);
             this.fxManager.createSparkImpact(hitPoint, norm);
