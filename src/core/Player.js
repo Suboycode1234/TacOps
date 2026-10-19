@@ -425,8 +425,15 @@ export class Player {
             if (anims[sw]) {
               const act = this.knifeMixer.clipAction(anims[sw]);
               act.setLoop(THREE.LoopOnce, 1);
-              act.clampWhenFinished = true;
+              act.clampWhenFinished = false; // Do NOT clamp: return cleanly to idle!
               this.knifeActions[sw] = act;
+            }
+          });
+
+          // When swing finishes, return to idle animation
+          this.knifeMixer.addEventListener('finished', (e) => {
+            if (this.knifeActions && this.knifeActions.idle) {
+              this.knifeActions.idle.reset().fadeIn(0.12).play();
             }
           });
         }
@@ -526,11 +533,17 @@ export class Player {
 
       // Play combo swing
       const swingKey = 'swing' + (this.knifeComboIndex + 1);
-      if (this.knifeActions && this.knifeActions[swingKey]) {
+      const action = this.knifeActions && this.knifeActions[swingKey];
+      if (action) {
         ['swing1', 'swing2', 'swing3', 'swing4'].forEach(k => {
-          if (this.knifeActions[k]) this.knifeActions[k].stop();
+          if (this.knifeActions[k] && this.knifeActions[k] !== action) {
+            this.knifeActions[k].stop();
+          }
         });
-        this.knifeActions[swingKey].reset().play();
+        if (this.knifeActions.idle) {
+          this.knifeActions.idle.fadeOut(0.06);
+        }
+        action.reset().fadeIn(0.04).play();
       }
       this.knifeComboIndex = (this.knifeComboIndex + 1) % 4;
 

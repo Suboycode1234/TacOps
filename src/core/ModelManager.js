@@ -3,6 +3,30 @@ import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 class ModelManager {
+
+  normalizeClipTimes(clip) {
+    if (!clip || !clip.tracks || clip.tracks.length === 0) return clip;
+    let minTime = Infinity;
+    let maxTime = -Infinity;
+    clip.tracks.forEach((track) => {
+      if (track.times && track.times.length > 0) {
+        if (track.times[0] < minTime) minTime = track.times[0];
+        const last = track.times[track.times.length - 1];
+        if (last > maxTime) maxTime = last;
+      }
+    });
+
+    if (minTime > 0.0001 && minTime !== Infinity) {
+      clip.tracks.forEach((track) => {
+        for (let i = 0; i < track.times.length; i++) {
+          track.times[i] -= minTime;
+        }
+      });
+      clip.duration = Math.max(0.1, maxTime - minTime);
+    }
+    return clip;
+  }
+
   constructor() {
     this.fbxLoader = new FBXLoader();
     this.textureLoader = new THREE.TextureLoader();
@@ -517,11 +541,21 @@ class ModelManager {
       ]);
 
       const anims = {};
-      if (idleFbx && idleFbx.animations && idleFbx.animations.length > 0) anims.idle = idleFbx.animations[0];
-      if (s1Fbx && s1Fbx.animations && s1Fbx.animations.length > 0) anims.swing1 = s1Fbx.animations[0];
-      if (s2Fbx && s2Fbx.animations && s2Fbx.animations.length > 0) anims.swing2 = s2Fbx.animations[0];
-      if (s3Fbx && s3Fbx.animations && s3Fbx.animations.length > 0) anims.swing3 = s3Fbx.animations[0];
-      if (s4Fbx && s4Fbx.animations && s4Fbx.animations.length > 0) anims.swing4 = s4Fbx.animations[0];
+      if (idleFbx && idleFbx.animations && idleFbx.animations.length > 0) {
+        anims.idle = this.normalizeClipTimes(idleFbx.animations[0]);
+      }
+      if (s1Fbx && s1Fbx.animations && s1Fbx.animations.length > 0) {
+        anims.swing1 = this.normalizeClipTimes(s1Fbx.animations[0]);
+      }
+      if (s2Fbx && s2Fbx.animations && s2Fbx.animations.length > 0) {
+        anims.swing2 = this.normalizeClipTimes(s2Fbx.animations[0]);
+      }
+      if (s3Fbx && s3Fbx.animations && s3Fbx.animations.length > 0) {
+        anims.swing3 = this.normalizeClipTimes(s3Fbx.animations[0]);
+      }
+      if (s4Fbx && s4Fbx.animations && s4Fbx.animations.length > 0) {
+        anims.swing4 = this.normalizeClipTimes(s4Fbx.animations[0]);
+      }
 
             // Measure native FBX and scale to authentic first-person viewmodel size (~0.40m)
       const box = new THREE.Box3().setFromObject(model);
@@ -531,6 +565,9 @@ class ModelManager {
       const targetLength = 0.40;
       const scale = maxDim > 0.001 ? (targetLength / maxDim) : 0.005;
       model.scale.setScalar(scale);
+
+      // Rotate knife 180 degrees so blade and arms face FORWARD into the screen (away from player)
+      model.rotation.y = Math.PI;
 
       // Wrap in a dedicated container so viewmodel scale resets do not clobber it
       const knifeGroup = new THREE.Group();
