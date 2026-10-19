@@ -6,6 +6,11 @@ A high-performance, responsive 3D tactical shooter inspired by Counter-Strike, b
 
 ---
 
+> [!WARNING]
+> **Active Development Notice**: The latest features pushed to the `main` branch (including body part damage scaling, 3rd-person knife mode, and recent melee adjustments) **have not yet undergone full testing and may be nonfunctional or unstable**. Testing and tuning are ongoing.
+
+---
+
 ## ⚡ Quick Play & Releases
 
 > **Note for Beginners**:
@@ -24,13 +29,14 @@ The following bugs and feature requests are actively prioritized:
 - [x] **Knife Animations & Scale Bug**: Tactical knife model calibrated to 0.38m realistic scale, rotated forward, and keyframe tracks normalized to 0.0s start.
 - [x] **Falling Out of Map Bug**: Player and bots now protected with full BSP wall segment collision, boundary clamping, and void fall safety net.
 - [x] **Terrorist 3rd Person Orientation Bug**: Inverted Terrorist model yaw in player 3rd person perspective.
+- [x] **3rd-Person Knife Mode**: Attached dedicated isolated tactical combat knife to operative hand bone in 3rd person perspective. *(Note: Latest feature, not fully tested and may be nonfunctional)*.
 - [ ] **Difficulty to Kill Enemy Bots Bug**: Enemy bot HP and evasion parameters need re-tuning for balanced, enjoyable combat.
 - [x] **No Reliable GUI Weapon Selection Bug**: Added clickable on-screen Tactical Weapon Selector HUD [1] [2] [3] and [B] Arsenal Requisition.
 - [ ] **Movement Does Not Affect Aim Spread**: Dynamic crosshair bloom and accuracy penalties when sprinting or moving need realistic tuning.
 - [ ] **Bot Over-Movement**: Enemy bots currently move around excessively; requires tactical hold-angle pauses and smoother patrol waypoints.
 - [ ] **Weapon Damage Scaling**: Lack of damage falloff curves over long distances.
 - [ ] **Scoped Weapons Zoom Overlay**: Scoped weapons currently lack specialized optical reticle overlays.
-- [x] **Hitbox / Body Part Damage Scaling**: Implemented full body part damage scaling across Head (3.5x - 4x), Torso (1.0x), and Limbs (0.75x) with helmet and armor absorption.
+- [x] **Hitbox / Body Part Damage Scaling**: Implemented full body part damage scaling across Head (3.5x - 4x), Torso (1.0x), and Limbs (0.75x) with helmet and armor absorption. *(Note: Latest feature, not fully tested and may be nonfunctional)*.
 
 ---
 

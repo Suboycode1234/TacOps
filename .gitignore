@@ -36,3 +36,7 @@ dist-ssr
 
 *.tga
 *.TGA
+
+# Standalone distribution file (only published via GitHub Releases)
+*standalone*.html
+Tacops_standalone.html
