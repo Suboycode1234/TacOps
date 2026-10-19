@@ -215,7 +215,7 @@ export class Bot {
       const gun = await modelManager.getWeaponModel(gunKey);
       if (gun) {
         gun.scale.setScalar(0.85);
-        const handBone = modelManager.findRightHandBone(model);
+        const handBone = modelManager.findRightHandBone(this.model);
         if (handBone) {
           if (this.team === 'T') {
             gun.position.set(0.06, 0.12, -0.08);

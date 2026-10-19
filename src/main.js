@@ -1,3 +1,8 @@
+import * as THREE from 'three';
+window.THREE = THREE;
+if (typeof window !== 'undefined' && window.__resolveTacopsAssetUrl) {
+  THREE.DefaultLoadingManager.setURLModifier((url) => window.__resolveTacopsAssetUrl(url));
+}
 import { Game } from './core/Game.js';
 import { WEAPONS, EQUIPMENT } from './core/WeaponData.js';
 import { soundManager } from './core/SoundManager.js';

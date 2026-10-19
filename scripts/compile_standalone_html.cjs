@@ -96,7 +96,7 @@ let processedHtml = distHtml.replace(cssMatch[0], '<style>\n' + cssContent + '\n
 // Remove external JS script tag (we will inject it at the end of body)
 processedHtml = processedHtml.replace(jsMatch[0], '');
 
-// Split at </head> to inject bootloader and inert asset scripts
+// Split at </head> to inject assets and then bootloader
 const headCloseIndex = processedHtml.indexOf('</head>');
 if (headCloseIndex === -1) throw new Error('No </head> tag found in HTML');
 
@@ -105,11 +105,27 @@ const bodyAfter = processedHtml.substring(headCloseIndex);
 
 writeStream.write(headBefore);
 
-// Write bootloader script
+// CRITICAL: Write all asset script tags FIRST so they exist in DOM when bootloader runs!
+console.log('   Writing asset script tags before bootloader...');
+let count = 0;
+for (const file of assetFiles) {
+  const rel = '/' + path.relative(distPath, file).replace(/\\/g, '/');
+  const mime = getMimeType(file);
+  const buf = fs.readFileSync(file);
+  const b64 = buf.toString('base64');
+  writeStream.write('<script type="text/plain" data-asset="' + rel + '" data-mime="' + mime + '">' + b64 + '</script>\n');
+  count++;
+  if (count % 25 === 0 || count === assetFiles.length) {
+    console.log('   Inlined ' + count + '/' + assetFiles.length + ' assets...');
+  }
+}
+
+// Write bootloader script AFTER all asset tags
 const bootloader = `
   <!-- TACOPS STANDALONE ASSET BOOTLOADER -->
   <script>
   (function() {
+    console.log('[TacOps Bootloader] Starting in-memory asset resolution...');
     window.__ASSET_BLOB_URLS__ = {};
 
     function base64ToBlob(base64, mime) {
@@ -127,8 +143,10 @@ const bootloader = `
       return new Blob(byteArrays, { type: mime });
     }
 
-    // Process all inert asset script tags
+    // Process all inert asset script tags (they exist in the DOM right above this script!)
     const assetScripts = document.querySelectorAll('script[data-asset]');
+    console.log('[TacOps Bootloader] Found ' + assetScripts.length + ' embedded asset tags.');
+    
     assetScripts.forEach(el => {
       try {
         const rawPath = el.getAttribute('data-asset');
@@ -152,21 +170,50 @@ const bootloader = `
         el.textContent = '';
         el.remove();
       } catch (err) {
-        console.warn('Error creating blob for', el.getAttribute('data-asset'), err);
+        console.warn('[TacOps Bootloader] Error creating blob for', el.getAttribute('data-asset'), err);
       }
     });
 
     function resolveUrl(url) {
       if (!url || typeof url !== 'string') return url;
       if (url.startsWith('blob:') || url.startsWith('data:')) return url;
+      
+      // 1. Direct match
       if (window.__ASSET_BLOB_URLS__[url]) return window.__ASSET_BLOB_URLS__[url];
       if (window.__ASSET_BLOB_URLS__[url.toLowerCase()]) return window.__ASSET_BLOB_URLS__[url.toLowerCase()];
 
+      // 2. Decoded match
       try {
         const dec = decodeURIComponent(url);
         if (window.__ASSET_BLOB_URLS__[dec]) return window.__ASSET_BLOB_URLS__[dec];
       } catch(e) {}
 
+      // 3. Slice from /models/ or /assets/
+      const idxModels = url.indexOf('/models/');
+      if (idxModels !== -1) {
+        const sub = url.substring(idxModels);
+        if (window.__ASSET_BLOB_URLS__[sub]) return window.__ASSET_BLOB_URLS__[sub];
+        if (window.__ASSET_BLOB_URLS__[sub.toLowerCase()]) return window.__ASSET_BLOB_URLS__[sub.toLowerCase()];
+      }
+      const idxModelsRel = url.indexOf('models/');
+      if (idxModelsRel !== -1) {
+        const sub = '/' + url.substring(idxModelsRel);
+        if (window.__ASSET_BLOB_URLS__[sub]) return window.__ASSET_BLOB_URLS__[sub];
+        if (window.__ASSET_BLOB_URLS__[sub.toLowerCase()]) return window.__ASSET_BLOB_URLS__[sub.toLowerCase()];
+      }
+
+      const idxAssets = url.indexOf('/assets/');
+      if (idxAssets !== -1) {
+        const sub = url.substring(idxAssets);
+        if (window.__ASSET_BLOB_URLS__[sub]) return window.__ASSET_BLOB_URLS__[sub];
+      }
+      const idxAssetsRel = url.indexOf('assets/');
+      if (idxAssetsRel !== -1) {
+        const sub = '/' + url.substring(idxAssetsRel);
+        if (window.__ASSET_BLOB_URLS__[sub]) return window.__ASSET_BLOB_URLS__[sub];
+      }
+
+      // 4. URL pathname
       try {
         const parsed = new URL(url, window.location.href);
         const pathname = parsed.pathname;
@@ -183,12 +230,13 @@ const bootloader = `
     }
     window.__resolveTacopsAssetUrl = resolveUrl;
 
-    // 1. Hook THREE.DefaultLoadingManager
+    // 1. Hook THREE.DefaultLoadingManager if THREE already exists
     let _three = window.THREE;
     function hookThree(threeObj) {
       if (threeObj && threeObj.DefaultLoadingManager) {
         threeObj.DefaultLoadingManager.setURLModifier(function(url) {
-          return resolveUrl(url);
+          const res = resolveUrl(url);
+          return res;
         });
       }
     }
@@ -235,7 +283,21 @@ const bootloader = `
       });
     }
 
-    // 5. Replace existing DOM images with blob URLs once DOM is ready
+    // 5. Disable crossOrigin = 'anonymous' on file:// to prevent CORS block
+    const origCrossOriginDesc = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'crossOrigin');
+    if (origCrossOriginDesc && origCrossOriginDesc.set) {
+      Object.defineProperty(HTMLImageElement.prototype, 'crossOrigin', {
+        get: origCrossOriginDesc.get,
+        set: function(val) {
+          if (window.location.protocol === 'file:') return;
+          return origCrossOriginDesc.set.call(this, val);
+        },
+        configurable: true,
+        enumerable: true
+      });
+    }
+
+    // 6. Replace existing DOM images with blob URLs once DOM is ready
     document.addEventListener('DOMContentLoaded', () => {
       document.querySelectorAll('img[src]').forEach(img => {
         const s = img.getAttribute('src');
@@ -244,26 +306,12 @@ const bootloader = `
       });
     });
 
-    console.log('[TacOps] Standalone Asset Bootloader initialized with', Object.keys(window.__ASSET_BLOB_URLS__).length, 'routes.');
+    console.log('[TacOps Bootloader] Ready. Registered', Object.keys(window.__ASSET_BLOB_URLS__).length, 'routes.');
   })();
   </script>
 `;
 
 writeStream.write(bootloader);
-
-// Write inert asset script tags
-let count = 0;
-for (const file of assetFiles) {
-  const rel = '/' + path.relative(distPath, file).replace(/\\/g, '/');
-  const mime = getMimeType(file);
-  const buf = fs.readFileSync(file);
-  const b64 = buf.toString('base64');
-  writeStream.write('<script type="text/plain" data-asset="' + rel + '" data-mime="' + mime + '">' + b64 + '</script>\n');
-  count++;
-  if (count % 20 === 0 || count === assetFiles.length) {
-    console.log('   Inlined ' + count + '/' + assetFiles.length + ' assets...');
-  }
-}
 
 // Split bodyAfter before </body> to inject JS module
 const bodyCloseIndex = bodyAfter.indexOf('</body>');
