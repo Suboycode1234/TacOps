@@ -21,11 +21,11 @@ A high-performance, responsive 3D tactical shooter inspired by Counter-Strike, b
 
 The following bugs and feature requests are actively prioritized:
 
-- [ ] **Knife Animations & Scale Bug**: Tactical knife model currently loads super oversized and covers map geometry; requires bounding box normalization and scale clamping.
-- [ ] **Falling Out of Map Bug**: Player and bots occasionally fall through collision seam boundaries into the void; requires strict wall bounds collision clamping.
-- [ ] **Terrorist 3rd Person Orientation Bug**: In player 3rd person perspective, Terrorist model is facing backwards (running backwards while moving forward); requires local model yaw coordinate inversion.
+- [x] **Knife Animations & Scale Bug**: Tactical knife model calibrated to 0.38m realistic scale, rotated forward, and keyframe tracks normalized to 0.0s start.
+- [x] **Falling Out of Map Bug**: Player and bots now protected with full BSP wall segment collision, boundary clamping, and void fall safety net.
+- [x] **Terrorist 3rd Person Orientation Bug**: Inverted Terrorist model yaw in player 3rd person perspective.
 - [ ] **Difficulty to Kill Enemy Bots Bug**: Enemy bot HP and evasion parameters need re-tuning for balanced, enjoyable combat.
-- [ ] **No Reliable GUI Weapon Selection Bug**: Lack of an interactive in-game on-screen GUI to pick and equip available weapons directly.
+- [x] **No Reliable GUI Weapon Selection Bug**: Added clickable on-screen Tactical Weapon Selector HUD [1] [2] [3] and [B] Arsenal Requisition.
 - [ ] **Movement Does Not Affect Aim Spread**: Dynamic crosshair bloom and accuracy penalties when sprinting or moving need realistic tuning.
 - [ ] **Bot Over-Movement**: Enemy bots currently move around excessively; requires tactical hold-angle pauses and smoother patrol waypoints.
 - [ ] **Weapon Damage Scaling**: Lack of damage falloff curves over long distances.

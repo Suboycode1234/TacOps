@@ -18,6 +18,25 @@ export class Bot {
     this.group.position.copy(spawnPos);
     this.scene.add(this.group);
 
+    // Collision & elevation safety
+    this.botRadius = 0.42;
+    this.lastValidPos = spawnPos.clone();
+    this.lastStuckCheckPos = spawnPos.clone();
+    this.stuckTimer = 0;
+
+    // Ground bot initially to ensure exact floor height
+    if (this.mapManager && this.mapManager.getGroundHeight) {
+      const gh = this.mapManager.getGroundHeight(
+        this.group.position.x,
+        this.group.position.z,
+        this.group.position.y
+      );
+      if (gh > -4.5) {
+        this.group.position.y = gh;
+        this.lastValidPos.copy(this.group.position);
+      }
+    }
+
     // Enlarged scale multiplier
     this.scaleMultiplier = 1.35;
 
@@ -42,19 +61,33 @@ export class Bot {
     this.ammo = 30;
     this.reloadTimer = 0;
 
-    // Authentic Dust 2 Largo Patrol Waypoints along Long A
-    this.patrolWaypoints = [
-      new THREE.Vector3(-18.0, 3.25, 20.0), // T Base Outside Long Doors
-      new THREE.Vector3(-10.0, 3.25, 16.0), // Outside Long Doors peeking
-      new THREE.Vector3(-2.0, 2.8, 14.0),   // Inside Long Doors
-      new THREE.Vector3(4.0, 2.5, 10.0),    // Blue box exit
-      new THREE.Vector3(6.0, 2.2, 0.0),     // Long A Corner (Car)
-      new THREE.Vector3(8.0, 1.8, -15.0),   // Long A Mid Alley
-      new THREE.Vector3(14.0, 0.5, -25.0),  // Pit Edge
-      new THREE.Vector3(10.0, 2.2, -32.0),  // Long A Site Ramp
-      new THREE.Vector3(10.0, 2.44, -42.0), // A Bombsite edge
-      new THREE.Vector3(6.0, 2.44, -48.0),  // CT Cross
-    ];
+    // Authentic Dust 2 Largo Patrol Waypoints - verified on valid floor geometry
+    if (this.team === 'T') {
+      this.patrolWaypoints = [
+        new THREE.Vector3(-18.0, 3.25, 20.0), // T Base Outside Long Doors
+        new THREE.Vector3(-10.0, 3.0, 18.0),  // Outside Long Doors peeking
+        new THREE.Vector3(-2.0, 2.0, 16.0),   // Inside Long Doors
+        new THREE.Vector3(6.0, 0.5, 12.0),    // Blue box exit
+        new THREE.Vector3(10.0, 0.5, 5.0),    // Long A Corner
+        new THREE.Vector3(14.0, 0.5, -2.0),   // Long A Car Area
+        new THREE.Vector3(16.0, 0.5, -10.0),  // Long A Mid Alley
+        new THREE.Vector3(16.0, 0.5, -18.0),  // Long A Street
+        new THREE.Vector3(18.0, 0.5, -25.0),  // Pit / Ramp entrance
+        new THREE.Vector3(21.0, 3.25, -28.5)  // Long A Site Ramp
+      ];
+    } else {
+      this.patrolWaypoints = [
+        new THREE.Vector3(8.0, 2.44, -46.0),  // CT Base
+        new THREE.Vector3(10.0, 2.44, -42.0), // A Bombsite platform
+        new THREE.Vector3(21.0, 3.25, -28.5), // Long A Site Ramp
+        new THREE.Vector3(18.0, 0.5, -25.0),  // Long A Street / Pit
+        new THREE.Vector3(16.0, 0.5, -18.0),  // Long A Street
+        new THREE.Vector3(16.0, 0.5, -10.0),  // Long A Mid Alley
+        new THREE.Vector3(14.0, 0.5, -2.0),   // Long A Car Area
+        new THREE.Vector3(10.0, 0.5, 5.0),    // Long A Corner
+        new THREE.Vector3(6.0, 0.5, 12.0)     // Outside Long Doors
+      ];
+    }
     this.currentWaypointIdx = Math.floor(Math.random() * this.patrolWaypoints.length);
     this.targetPos = this.patrolWaypoints[this.currentWaypointIdx].clone();
 
@@ -119,40 +152,65 @@ export class Bot {
     const ctx = this.billboardCtx;
     ctx.clearRect(0, 0, 256, 64);
 
-    // Background panel
+    // Dark semi-transparent pill background
     ctx.fillStyle = 'rgba(10, 14, 20, 0.78)';
     ctx.beginPath();
-    ctx.roundRect(4, 4, 248, 56, 8);
+    ctx.roundRect(10, 8, 236, 48, 8);
     ctx.fill();
 
     // Border
-    const teamColor = this.team === 'CT' ? '#38bdf8' : '#f97316';
-    ctx.strokeStyle = this.state === 'ATTACK' ? '#ef4444' : teamColor;
-    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = this.team === 'T' ? 'rgba(235, 120, 40, 0.85)' : 'rgba(80, 160, 240, 0.85)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(10, 8, 236, 48, 8);
     ctx.stroke();
 
-    // Name & State Text
-    ctx.font = 'bold 18px "Inter", sans-serif';
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(`${this.name}`, 14, 26);
+    // Bot Name and Team Tag
+    ctx.font = 'bold 16px "Share Tech Mono", monospace';
+    ctx.fillStyle = this.team === 'T' ? '#ff9944' : '#66b2ff';
+    ctx.textAlign = 'left';
+    ctx.fillText('[' + this.team + '] ' + this.name, 20, 28);
 
-    ctx.font = 'bold 13px "Inter", monospace';
-    ctx.fillStyle = this.state === 'ATTACK' ? '#ef4444' : (this.state === 'ALERT' ? '#eab308' : '#94a3b8');
-    const stateLabel = this.state === 'ATTACK' ? 'ENGAGING' : (this.state === 'RELOAD' ? 'RELOADING' : this.state);
-    ctx.fillText(`[${stateLabel}]`, 140, 25);
+    // State Indicator Badge
+    ctx.font = 'bold 13px sans-serif';
+    if (this.state === 'ATTACK') {
+      ctx.fillStyle = '#ff3333';
+      ctx.fillText('COMBAT', 170, 28);
+    } else if (this.state === 'ALERT') {
+      ctx.fillStyle = '#ffcc00';
+      ctx.fillText('ALERT', 176, 28);
+    } else if (this.state === 'RELOAD') {
+      ctx.fillStyle = '#ff8800';
+      ctx.fillText('RELOAD', 170, 28);
+    } else {
+      ctx.fillStyle = '#88aacc';
+      ctx.fillText('PATROL', 174, 28);
+    }
 
     // Health Bar Background
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-    ctx.fillRect(14, 36, 228, 14);
+    ctx.fillStyle = 'rgba(40, 45, 55, 0.9)';
+    ctx.fillRect(20, 36, 216, 12);
 
     // Health Bar Fill
-    const hpPct = Math.max(0, this.health / this.maxHealth);
-    let barColor = '#22c55e';
-    if (hpPct < 0.35) barColor = '#ef4444';
-    else if (hpPct < 0.65) barColor = '#eab308';
+    const pct = Math.max(0, this.health / this.maxHealth);
+    const healthGradient = ctx.createLinearGradient(20, 0, 20 + 216 * pct, 0);
+    if (pct > 0.5) {
+      healthGradient.addColorStop(0, '#00cc66');
+      healthGradient.addColorStop(1, '#66ff99');
+    } else if (pct > 0.25) {
+      healthGradient.addColorStop(0, '#ff9900');
+      healthGradient.addColorStop(1, '#ffcc00');
+    } else {
+      healthGradient.addColorStop(0, '#cc0000');
+      healthGradient.addColorStop(1, '#ff3333');
+    }
+    ctx.fillStyle = healthGradient;
+    ctx.fillRect(20, 36, 216 * pct, 12);
 
-    ctx.fillStyle = barColor;
-    ctx.fillRect(14, 36, 228 * hpPct, 14);
+    // Health Bar border
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(20, 36, 216, 12);
 
     this.billboardTexture.needsUpdate = true;
   }
@@ -166,15 +224,14 @@ export class Bot {
           this.placeholder = null;
         }
 
-        // Apply scale multiplier for enlarged tactical presence
         model.scale.multiplyScalar(this.scaleMultiplier);
         this.model = model;
         this.group.add(model);
 
-        // Preload and attach Mixamo animations
+        // Preload and attach animations
         const [walkClip, runClip] = await Promise.all([
-          modelManager.getTerroristAnimation('Walking'),
-          modelManager.getTerroristAnimation('Running'),
+          modelManager.getTerroristAnimation('walk'),
+          modelManager.getTerroristAnimation('run'),
         ]);
 
         if (model) {
@@ -184,7 +241,7 @@ export class Bot {
           if (this.walkAction) this.walkAction.play();
         }
       } else {
-        // CT Bot using the new Counter-Terrorist model with Blender rig
+        // CT Bot using Counter-Terrorist model
         const model = await modelManager.getCounterTerroristModel();
         if (this.placeholder) {
           this.group.remove(this.placeholder);
@@ -238,7 +295,7 @@ export class Bot {
       this.muzzleLight.position.set(0.28, 1.50, 0.85);
       this.group.add(this.muzzleLight);
     } catch (e) {
-      console.warn(`Bot model init error for team ${this.team}:`, e);
+      console.warn('Bot model init error for team ' + this.team + ':', e);
     }
   }
 
@@ -268,6 +325,69 @@ export class Bot {
     legBox.userData = { bot: this, part: 'legs', multiplier: 0.75 };
     this.group.add(legBox);
     this.hitboxes.push(legBox);
+  }
+
+  resolveCollisions(pos) {
+    const r = this.botRadius;
+    const stepHeight = 0.45; // Obstacles below stepHeight are ground/stairs/ramps, NOT blocking walls
+
+    // High-precision circle-to-segment collision with authentic BSP wall normals
+    const segments = this.mapManager ? this.mapManager.wallSegments : null;
+    if (segments && segments.length > 0) {
+      for (let i = 0; i < segments.length; i++) {
+        const w = segments[i];
+        if (pos.y + 1.8 <= w.minY || pos.y + stepHeight >= w.maxY) continue;
+
+        const x1 = w.p1[0], z1 = w.p1[1];
+        const x2 = w.p2[0], z2 = w.p2[1];
+        const dx = x2 - x1, dz = z2 - z1;
+        const lenSq = dx * dx + dz * dz;
+        if (lenSq === 0) continue;
+        const t = Math.max(0, Math.min(1, ((pos.x - x1) * dx + (pos.z - z1) * dz) / lenSq));
+        const cx = x1 + t * dx, cz = z1 + t * dz;
+        const distX = pos.x - cx, distZ = pos.z - cz;
+        const distSq = distX * distX + distZ * distZ;
+
+        if (distSq < r * r) {
+          const dist = Math.sqrt(distSq);
+          const overlap = r - dist;
+          if (dist > 0.0001) {
+            pos.x += (distX / dist) * overlap;
+            pos.z += (distZ / dist) * overlap;
+          } else {
+            pos.x += w.nx * overlap;
+            pos.z += w.nz * overlap;
+          }
+        }
+      }
+      return;
+    }
+
+    const colliders = this.mapManager ? this.mapManager.colliders : null;
+    if (!colliders) return;
+
+    for (let i = 0; i < colliders.length; i++) {
+      const box = colliders[i].box;
+      if (
+        pos.x + r > box.min.x &&
+        pos.x - r < box.max.x &&
+        pos.z + r > box.min.z &&
+        pos.z - r < box.max.z &&
+        pos.y + 1.8 > box.min.y &&
+        pos.y + stepHeight < box.max.y
+      ) {
+        const penX1 = box.max.x - (pos.x - r);
+        const penX2 = (pos.x + r) - box.min.x;
+        const penZ1 = box.max.z - (pos.z - r);
+        const penZ2 = (pos.z + r) - box.min.z;
+
+        const minPen = Math.min(penX1, penX2, penZ1, penZ2);
+        if (minPen === penX1) pos.x = box.max.x + r;
+        else if (minPen === penX2) pos.x = box.min.x - r;
+        else if (minPen === penZ1) pos.z = box.max.z + r;
+        else if (minPen === penZ2) pos.z = box.min.z - r;
+      }
+    }
   }
 
   hearStimulus(soundPos) {
@@ -336,6 +456,11 @@ export class Bot {
       this.weaponMesh.position.y = 0.1;
       this.weaponMesh.rotation.z = Math.PI / 2;
     }
+
+    // Keep dead body on valid ground height
+    if (this.lastValidPos) {
+      this.group.position.y = this.lastValidPos.y;
+    }
   }
 
   update(delta, player, onBotFire) {
@@ -349,15 +474,6 @@ export class Bot {
     }
 
     if (!player) return;
-
-    // Ground bot to authentic Dust 2 map elevation
-    if (this.mapManager && this.mapManager.getGroundHeight) {
-      this.group.position.y = this.mapManager.getGroundHeight(
-        this.group.position.x,
-        this.group.position.z,
-        this.group.position.y
-      );
-    }
 
     if (this.mixer) {
       this.mixer.update(delta);
@@ -446,6 +562,40 @@ export class Bot {
         this.updatePatrol(delta);
       }
     }
+
+    // 1. Resolve collision against authentic BSP map walls and prop colliders
+    this.resolveCollisions(botPos);
+
+    // 2. Hard boundary clamping to Dust II walkable area
+    botPos.x = Math.max(-23.5, Math.min(47.5, botPos.x));
+    botPos.z = Math.max(-80.0, Math.min(26.5, botPos.z));
+
+    // 3. Ground bot to authentic Dust 2 map elevation with void step-back protection
+    if (this.mapManager && this.mapManager.getGroundHeight) {
+      const gh = this.mapManager.getGroundHeight(botPos.x, botPos.z, botPos.y);
+      if (gh > -4.5) {
+        botPos.y = gh;
+        this.lastValidPos.copy(botPos);
+      } else {
+        // Stepped off floor edge into void: restore last valid floor coordinate
+        botPos.copy(this.lastValidPos);
+        this.strafeDir *= -1;
+      }
+    }
+
+    // 4. Void fall safety net: if bot falls below ground level or out of bounds, teleport to team spawn
+    if (botPos.y < -4.5 || botPos.x < -24.0 || botPos.x > 48.0 || botPos.z < -81.0 || botPos.z > 27.5) {
+      const safeSpawn = this.team === 'CT'
+        ? (this.mapManager && this.mapManager.spawnPointsCT && this.mapManager.spawnPointsCT.length > 0
+            ? this.mapManager.spawnPointsCT[0]
+            : new THREE.Vector3(11.38, 2.44, -43.89))
+        : (this.mapManager && this.mapManager.spawnPointsT && this.mapManager.spawnPointsT.length > 0
+            ? this.mapManager.spawnPointsT[0]
+            : new THREE.Vector3(-18.69, 3.25, 20.32));
+      botPos.copy(safeSpawn);
+      this.lastValidPos.copy(safeSpawn);
+      this.strafeDir *= -1;
+    }
   }
 
   checkLineOfSight(playerPos, dist) {
@@ -483,9 +633,8 @@ export class Bot {
     this.burstCount++;
     this.ammo--;
 
-    // Dynamic fire rate & bursts based on distance (reduced for balanced gameplay)
+    // Dynamic fire rate & bursts based on distance
     if (dist < 10) {
-      // Close range: 3-round burst with tactical pause
       if (this.burstCount >= 3) {
         this.fireInterval = 1.15 + Math.random() * 0.45;
         this.burstCount = 0;
@@ -493,7 +642,6 @@ export class Bot {
         this.fireInterval = 0.20 + Math.random() * 0.04;
       }
     } else if (dist < 24) {
-      // Mid range: 2-round burst
       if (this.burstCount >= 2) {
         this.fireInterval = 1.35 + Math.random() * 0.50;
         this.burstCount = 0;
@@ -501,7 +649,6 @@ export class Bot {
         this.fireInterval = 0.26 + Math.random() * 0.06;
       }
     } else {
-      // Long range: 1-round tap
       if (this.burstCount >= 1) {
         this.fireInterval = 1.60 + Math.random() * 0.65;
         this.burstCount = 0;
@@ -533,7 +680,6 @@ export class Bot {
     const isHit = Math.random() < baseHitChance;
 
     if (isHit && !player.isDead) {
-      // Reduced damage: 5-8 dmg per hit so player can fight back
       const dmg = Math.floor(5 + Math.random() * 4);
       player.takeDamage(dmg, this.name, 'body');
     }
@@ -579,6 +725,18 @@ export class Bot {
     const pos = this.group.position;
     const dist = pos.distanceTo(this.targetPos);
 
+    // Stuck detection: if stuck in same spot for > 2.5s, switch to next waypoint
+    this.stuckTimer += delta;
+    if (pos.distanceTo(this.lastStuckCheckPos) > 0.4) {
+      this.lastStuckCheckPos.copy(pos);
+      this.stuckTimer = 0;
+    } else if (this.stuckTimer > 2.5) {
+      this.currentWaypointIdx = (this.currentWaypointIdx + 1) % this.patrolWaypoints.length;
+      this.targetPos = this.patrolWaypoints[this.currentWaypointIdx].clone();
+      this.strafeDir *= -1;
+      this.stuckTimer = 0;
+    }
+
     if (dist < 1.8) {
       this.currentWaypointIdx = (this.currentWaypointIdx + 1) % this.patrolWaypoints.length;
       this.targetPos = this.patrolWaypoints[this.currentWaypointIdx].clone();
@@ -623,15 +781,20 @@ export class BotManager {
     for (let i = 0; i < count; i++) {
       let spawn;
       if (spawnPoints && spawnPoints.length > 0) {
-        const idx = (i + 1) % spawnPoints.length;
-        spawn = spawnPoints[idx].clone();
+        // Exclude index 5 for T (isolated pit spawn) so bots cluster safely in T base
+        const validSpawns = this.botTeam === 'T' && spawnPoints.length >= 6
+          ? [spawnPoints[0], spawnPoints[1], spawnPoints[2], spawnPoints[3], spawnPoints[4]]
+          : spawnPoints;
+        const idx = i % validSpawns.length;
+        spawn = validSpawns[idx].clone();
       } else {
         spawn = this.botTeam === 'T'
           ? new THREE.Vector3(-18.69, 3.25, 20.32)
           : new THREE.Vector3(8.13, 2.44, -43.89);
       }
-      spawn.x += (Math.random() - 0.5) * 1.5;
-      spawn.z += (Math.random() - 0.5) * 1.5;
+      // Modest random jitter to prevent stacking, avoiding wall collision
+      spawn.x += (Math.random() - 0.5) * 0.5;
+      spawn.z += (Math.random() - 0.5) * 0.5;
 
       const name = names[i % names.length];
       const bot = new Bot(i + 1, name, spawn, this.scene, this.mapManager, this.botTeam);
