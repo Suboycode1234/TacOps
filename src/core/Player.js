@@ -56,7 +56,7 @@ export class Player {
     this.maxHealth = 100;
     this.armor = 100;
     this.hasHelmet = true;
-    this.money = 800;
+    this.money = 16000;
     this.isDead = false;
 
     // Kinematics
@@ -277,6 +277,8 @@ export class Player {
         while (this.playerBodyGroup.children.length > 0) {
           this.playerBodyGroup.remove(this.playerBodyGroup.children[0]);
         }
+        // Rotate Terrorist model 180 degrees so it faces forward (-Z) in 3rd person!
+        model.rotation.y = Math.PI;
         this.bodyModel = model;
         this.playerBodyGroup.add(model);
 
@@ -350,8 +352,13 @@ export class Player {
       const gun = await modelManager.getWeaponModel(this.activeWeapon.id);
       if (gun) {
         gun.scale.setScalar(0.7);
-        gun.position.set(0.22, 1.15, 0.28);
-        gun.rotation.set(0, -Math.PI / 2, 0);
+        if (this.team === 'T') {
+          gun.position.set(-0.22, 1.15, -0.28);
+          gun.rotation.set(0, Math.PI / 2, 0);
+        } else {
+          gun.position.set(0.22, 1.15, 0.28);
+          gun.rotation.set(0, -Math.PI / 2, 0);
+        }
         this.playerBodyGroup.add(gun);
         this.thirdPersonGunMesh = gun;
       }
@@ -401,8 +408,32 @@ export class Player {
     if (model) {
       model.position.set(0, 0, 0);
       model.rotation.set(0, 0, 0);
-      model.scale.set(1, 1, 1);
+      // Preserve calibrated model scale from ModelManager
       this.viewmodelContainer.add(model);
+
+      if (this.activeWeapon.id === 'knife') {
+        const anims = model.userData.animations;
+        const animTarget = model.userData.innerModel || model;
+        if (anims) {
+          this.knifeMixer = new THREE.AnimationMixer(animTarget);
+          this.knifeActions = {};
+          if (anims.idle) {
+            this.knifeActions.idle = this.knifeMixer.clipAction(anims.idle);
+            this.knifeActions.idle.play();
+          }
+          ['swing1', 'swing2', 'swing3', 'swing4'].forEach(sw => {
+            if (anims[sw]) {
+              const act = this.knifeMixer.clipAction(anims[sw]);
+              act.setLoop(THREE.LoopOnce, 1);
+              act.clampWhenFinished = true;
+              this.knifeActions[sw] = act;
+            }
+          });
+        }
+      } else {
+        this.knifeMixer = null;
+        this.knifeActions = {};
+      }
     }
 
     this.updateThirdPersonWeapon();
@@ -486,6 +517,32 @@ export class Player {
       this.finishReload();
     }
 
+    if (this.activeWeapon.id === 'knife') {
+      this.lastShootTime = now;
+      if (now - this.knifeLastClickTime > 3000) {
+        this.knifeComboIndex = 0;
+      }
+      this.knifeLastClickTime = now;
+
+      // Play combo swing
+      const swingKey = 'swing' + (this.knifeComboIndex + 1);
+      if (this.knifeActions && this.knifeActions[swingKey]) {
+        ['swing1', 'swing2', 'swing3', 'swing4'].forEach(k => {
+          if (this.knifeActions[k]) this.knifeActions[k].stop();
+        });
+        this.knifeActions[swingKey].reset().play();
+      }
+      this.knifeComboIndex = (this.knifeComboIndex + 1) % 4;
+
+      if (soundManager[this.activeWeapon.sound]) {
+        soundManager[this.activeWeapon.sound]();
+      }
+
+      this.performRaycastShot();
+      this.triggerStatsChange();
+      return;
+    }
+
     if (this.activeWeapon.magSize !== Infinity && this.activeWeapon.ammo <= 0) {
       soundManager.playDryFire();
       this.reload();
@@ -537,11 +594,15 @@ export class Player {
     if (this.isADS) spread *= 0.5;
 
     const raycaster = new THREE.Raycaster();
+    const isKnife = this.activeWeapon.id === 'knife';
     const screenCenter = new THREE.Vector2(
-      (Math.random() - 0.5) * spread * 2,
-      (Math.random() - 0.5) * spread * 2
+      isKnife ? 0 : (Math.random() - 0.5) * spread * 2,
+      isKnife ? 0 : (Math.random() - 0.5) * spread * 2
     );
     raycaster.setFromCamera(screenCenter, this.camera);
+    if (isKnife) {
+      raycaster.far = this.activeWeapon.range || 2.8;
+    }
 
     if (this.onShoot) {
       this.onShoot(raycaster, this.activeWeapon);
@@ -688,9 +749,32 @@ export class Player {
     }
 
     this.resolveCollisions(nextPos);
+
+    // Hard boundary clamping to Dust II walkable area
+    nextPos.x = Math.max(-23.5, Math.min(47.5, nextPos.x));
+    nextPos.z = Math.max(-80.0, Math.min(26.5, nextPos.z));
+
+    // Void fall safety net: if falling below ground level or outside bounds, teleport to team spawn
+    if (nextPos.y < -4.5 || nextPos.x < -24.0 || nextPos.x > 48.0 || nextPos.z < -81.0 || nextPos.z > 27.5) {
+      const safeSpawn = this.team === 'CT'
+        ? (this.mapManager && this.mapManager.spawnPointsCT && this.mapManager.spawnPointsCT[0] ? this.mapManager.spawnPointsCT[0] : new THREE.Vector3(11.38, 2.44, -43.89))
+        : (this.mapManager && this.mapManager.spawnPointsT && this.mapManager.spawnPointsT[0] ? this.mapManager.spawnPointsT[0] : new THREE.Vector3(-18.69, 3.25, 22.76));
+      nextPos.copy(safeSpawn);
+      this.velocity.set(0, 0, 0);
+      this.onGround = true;
+    }
+
     this.yawObject.position.copy(nextPos);
 
     const horizontalSpeed = Math.sqrt(this.velocity.x * this.velocity.x + this.velocity.z * this.velocity.z);
+
+    // Update knife viewmodel animations
+    if (this.knifeMixer) {
+      this.knifeMixer.update(delta);
+      if (this.knifeComboIndex > 0 && performance.now() - this.knifeLastClickTime > 3000) {
+        this.knifeComboIndex = 0;
+      }
+    }
 
     // Update 3rd person / body animations
     if (this.bodyMixer) {
@@ -811,9 +895,10 @@ export class Player {
         if (distSq < r * r) {
           const dist = Math.sqrt(distSq);
           const overlap = r - dist;
-          const dot = distX * w.nx + distZ * w.nz;
-          // Only push outward along the wall normal from the front/accessible side
-          if (dot >= -0.05) {
+          if (dist > 0.0001) {
+            pos.x += (distX / dist) * overlap;
+            pos.z += (distZ / dist) * overlap;
+          } else {
             pos.x += w.nx * overlap;
             pos.z += w.nz * overlap;
           }

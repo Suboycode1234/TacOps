@@ -1057,3 +1057,73 @@ body, html {
     filter: drop-shadow(0 0 24px rgba(255, 180, 60, 0.7));
   }
 }
+
+
+/* Weapon Selector GUI Bar */
+.weapon-hud-selector {
+  display: flex;
+  gap: 8px;
+  background: rgba(13, 17, 23, 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 6px 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+  pointer-events: auto;
+}
+
+.weapon-slot-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #c9d1d9;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-family: var(--font-hud, 'Chakra Petch', sans-serif);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  user-select: none;
+}
+
+.weapon-slot-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.weapon-slot-btn.active {
+  background: linear-gradient(135deg, rgba(230, 169, 60, 0.35), rgba(212, 143, 24, 0.15));
+  border-color: #e6a93c;
+  color: #fff;
+  box-shadow: 0 0 12px rgba(230, 169, 60, 0.45);
+}
+
+.weapon-slot-btn .slot-num {
+  color: #e6a93c;
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+}
+
+.weapon-slot-btn.active .slot-num {
+  color: #ffda73;
+}
+
+.weapon-slot-btn.armory-btn {
+  background: linear-gradient(135deg, rgba(77, 166, 255, 0.25), rgba(41, 121, 255, 0.12));
+  border-color: rgba(77, 166, 255, 0.4);
+}
+
+.weapon-slot-btn.armory-btn:hover {
+  background: linear-gradient(135deg, rgba(77, 166, 255, 0.4), rgba(41, 121, 255, 0.25));
+  border-color: #4da6ff;
+  box-shadow: 0 0 14px rgba(77, 166, 255, 0.45);
+}
+
+.weapon-slot-btn.armory-btn .slot-num {
+  color: #4da6ff;
+}

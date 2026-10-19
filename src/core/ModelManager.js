@@ -523,9 +523,22 @@ class ModelManager {
       if (s3Fbx && s3Fbx.animations && s3Fbx.animations.length > 0) anims.swing3 = s3Fbx.animations[0];
       if (s4Fbx && s4Fbx.animations && s4Fbx.animations.length > 0) anims.swing4 = s4Fbx.animations[0];
 
-      model.userData.animations = anims;
-      model.scale.setScalar(0.72);
-      return model;
+            // Measure native FBX and scale to authentic first-person viewmodel size (~0.40m)
+      const box = new THREE.Box3().setFromObject(model);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const targetLength = 0.40;
+      const scale = maxDim > 0.001 ? (targetLength / maxDim) : 0.005;
+      model.scale.setScalar(scale);
+
+      // Wrap in a dedicated container so viewmodel scale resets do not clobber it
+      const knifeGroup = new THREE.Group();
+      knifeGroup.add(model);
+      knifeGroup.userData.animations = anims;
+      knifeGroup.userData.isKnifeViewmodel = true;
+      knifeGroup.userData.innerModel = model;
+      return knifeGroup;
     } catch (e) {
       console.warn('Fallback tactical knife viewmodel:', e);
       return this.createTacticalKnife();

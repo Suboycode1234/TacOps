@@ -23,7 +23,7 @@
     hitSound: 'playKnifeHit',
     modelPath: '/models/Guns/Knife/Animations/Idle/source/arms@knife_idle.fbx',
     textureDir: '/models/Guns/Knife/Animations/Idle/textures/',
-    position: [0.0, -0.32, -0.42],
+    position: [0.10, -0.16, -0.32],
     rotation: [0.0, 0.0, 0.0],
     scale: 0.72,
     description: 'Special forces combat knife with tactical arms. Execute rapid 4-swing combos and lethal backstabs.',

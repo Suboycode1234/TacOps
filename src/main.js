@@ -342,3 +342,33 @@ if (viewModePillBtn) {
   });
 }
 
+
+// Wire Interactive GUI Weapon Selector Bar
+const slotBtn1 = document.getElementById('slot-btn-1');
+const slotBtn2 = document.getElementById('slot-btn-2');
+const slotBtn3 = document.getElementById('slot-btn-3');
+const slot1Name = document.getElementById('slot-1-name');
+const slot2Name = document.getElementById('slot-2-name');
+const openArmoryBtn = document.getElementById('open-armory-btn');
+
+function updateWeaponGuiSlots() {
+  if (!game || !game.player) return;
+  const p = game.player;
+  const active = p.activeSlot;
+  if (slotBtn1) slotBtn1.classList.toggle('active', active === 1);
+  if (slotBtn2) slotBtn2.classList.toggle('active', active === 2);
+  if (slotBtn3) slotBtn3.classList.toggle('active', active === 3);
+
+  if (slot1Name) {
+    slot1Name.textContent = p.inventory[1] ? p.inventory[1].name.toUpperCase() : 'NO PRIMARY';
+  }
+  if (slot2Name) {
+    slot2Name.textContent = p.inventory[2] ? p.inventory[2].name.toUpperCase() : 'DEAGLE';
+  }
+}
+
+if (slotBtn1) slotBtn1.addEventListener('click', (e) => { e.stopPropagation(); if (game && game.player && game.player.inventory[1]) { game.player.switchSlot(1); updateWeaponGuiSlots(); } });
+if (slotBtn2) slotBtn2.addEventListener('click', (e) => { e.stopPropagation(); if (game && game.player) { game.player.switchSlot(2); updateWeaponGuiSlots(); } });
+if (slotBtn3) slotBtn3.addEventListener('click', (e) => { e.stopPropagation(); if (game && game.player) { game.player.switchSlot(3); updateWeaponGuiSlots(); } });
+if (openArmoryBtn) openArmoryBtn.addEventListener('click', (e) => { e.stopPropagation(); openBuyMenu(); });
+
