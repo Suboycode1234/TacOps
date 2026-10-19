@@ -155,7 +155,15 @@ export class Game {
 
       // 3. Process bot hit
       if (hitBot) {
-        let finalDamage = Math.round(weapon.damage * hitMultiplier);
+        let multiplier = 1.0;
+        if (isHeadshot) {
+          multiplier = weapon.headshotMultiplier || 3.5;
+        } else if (hitPart === 'legs') {
+          multiplier = 0.75;
+        } else {
+          multiplier = 1.0;
+        }
+        let finalDamage = Math.round(weapon.damage * multiplier);
 
         if (weapon.category === 'melee') {
           // Check lethal backstab angle

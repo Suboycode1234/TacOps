@@ -8,9 +8,9 @@
     damage: 55,
     backstabMultiplier: 2.36, // Lethal 130 dmg backstab
     headshotMultiplier: 1.5,
-    fireRate: 2.2,
-    isAutomatic: false,
-    range: 2.8,
+    fireRate: 3.2,
+    isAutomatic: true,
+    range: 3.25,
     reloadTime: 0,
     magSize: Infinity,
     maxReserve: Infinity,
@@ -90,7 +90,7 @@
     slot: 1,
     price: 3100,
     damage: 38,
-    headshotMultiplier: 2.8,
+    headshotMultiplier: 3.5,
     fireRate: 11.0, // 660 RPM
     isAutomatic: true,
     reloadTime: 2.8,

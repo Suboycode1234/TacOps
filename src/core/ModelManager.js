@@ -582,6 +582,54 @@ class ModelManager {
     }
   }
 
+  // Dedicated isolated 3rd-person tactical knife model (NO floating arms, exactly sized for character hand grip)
+  async getThirdPersonKnifeModel() {
+    try {
+      const fbx = await this.loadFBX('/models/Guns/Knife/Animations/Idle/source/arms@knife_idle.fbx');
+      const knifeColor = this.loadTexture('/models/Guns/Knife/Animations/Idle/textures/knifeColor.png');
+      const knifeMetal = this.loadTexture('/models/Guns/Knife/Animations/Idle/textures/knifeMetallic.png');
+      const knifeNormal = this.loadTexture('/models/Guns/Knife/Animations/Idle/textures/knifeNormal.png');
+      const knifeRough = this.loadTexture('/models/Guns/Knife/Animations/Idle/textures/knifeRoughness.png');
+
+      let knifeMesh = null;
+      fbx.traverse((c) => {
+        if (c.isMesh && c.name.toLowerCase() === 'knife') {
+          knifeMesh = c.clone();
+        }
+      });
+
+      if (!knifeMesh) {
+        return this.createTacticalKnife();
+      }
+
+      knifeMesh.material = new THREE.MeshStandardMaterial({
+        map: knifeColor,
+        metalnessMap: knifeMetal,
+        normalMap: knifeNormal,
+        roughnessMap: knifeRough,
+        roughness: 0.35,
+        metalness: 0.85,
+      });
+
+      knifeMesh.castShadow = true;
+      knifeMesh.receiveShadow = true;
+
+      // Scale knife to realistic combat knife size (~0.32m blade+handle)
+      knifeMesh.scale.setScalar(0.009);
+
+      // Wrapper group for clean pivot alignment in character right hand
+      const knifeWrapper = new THREE.Group();
+      knifeMesh.position.set(0, 0, 0);
+      knifeMesh.rotation.set(0, 0, 0);
+      knifeWrapper.add(knifeMesh);
+
+      return knifeWrapper;
+    } catch (e) {
+      console.warn('Fallback 3rd person knife:', e);
+      return this.createTacticalKnife();
+    }
+  }
+
   // Find right hand bone across both Counter-Terrorist and Terrorist armatures
   findRightHandBone(model) {
     if (!model) return null;

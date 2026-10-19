@@ -30,7 +30,7 @@ The following bugs and feature requests are actively prioritized:
 - [ ] **Bot Over-Movement**: Enemy bots currently move around excessively; requires tactical hold-angle pauses and smoother patrol waypoints.
 - [ ] **Weapon Damage Scaling**: Lack of damage falloff curves over long distances.
 - [ ] **Scoped Weapons Zoom Overlay**: Scoped weapons currently lack specialized optical reticle overlays.
-- [ ] **Hitbox / Body Part Damage Scaling**: Damage is uniform across body; needs distinct multipliers for Headshots (4x), Torso (1x), and Limbs (0.75x).
+- [x] **Hitbox / Body Part Damage Scaling**: Implemented full body part damage scaling across Head (3.5x - 4x), Torso (1.0x), and Limbs (0.75x) with helmet and armor absorption.
 
 ---
 

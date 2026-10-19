@@ -302,15 +302,15 @@ export class Bot {
   createHitboxes() {
     const headMat = new THREE.MeshBasicMaterial({ visible: false, wireframe: true });
 
-    // Head Hitbox (enlarged & adjusted for ~2.4m height)
-    const headGeo = new THREE.SphereGeometry(0.34, 10, 10);
+    // Head Hitbox - 3.5x critical headshot multiplier
+    const headGeo = new THREE.SphereGeometry(0.35, 10, 10);
     const headBox = new THREE.Mesh(headGeo, headMat);
     headBox.position.set(0, 2.22, 0);
-    headBox.userData = { bot: this, part: 'head', multiplier: 2.8 };
+    headBox.userData = { bot: this, part: 'head', multiplier: 3.5 };
     this.group.add(headBox);
     this.hitboxes.push(headBox);
 
-    // Torso Hitbox
+    // Torso Hitbox - 1.0x baseline torso multiplier
     const torsoGeo = new THREE.CylinderGeometry(0.42, 0.42, 1.05, 10);
     const torsoBox = new THREE.Mesh(torsoGeo, headMat);
     torsoBox.position.set(0, 1.50, 0);
@@ -318,7 +318,7 @@ export class Bot {
     this.group.add(torsoBox);
     this.hitboxes.push(torsoBox);
 
-    // Legs Hitbox
+    // Legs Hitbox - 0.75x reduced limb multiplier
     const legGeo = new THREE.CylinderGeometry(0.36, 0.36, 0.95, 10);
     const legBox = new THREE.Mesh(legGeo, headMat);
     legBox.position.set(0, 0.52, 0);
@@ -680,8 +680,24 @@ export class Bot {
     const isHit = Math.random() < baseHitChance;
 
     if (isHit && !player.isDead) {
-      const dmg = Math.floor(5 + Math.random() * 4);
-      player.takeDamage(dmg, this.name, 'body');
+      const roll = Math.random();
+      let hitPart = 'body';
+      let dmg = Math.floor(10 + Math.random() * 6); // Base 10-15 dmg
+
+      if (roll < 0.16) {
+        // 16% Headshot chance
+        hitPart = 'head';
+        dmg = Math.floor(dmg * 2.8);
+      } else if (roll < 0.76) {
+        // 60% Torso hit
+        hitPart = 'body';
+      } else {
+        // 24% Leg / Limb hit
+        hitPart = 'legs';
+        dmg = Math.floor(dmg * 0.75);
+      }
+
+      player.takeDamage(dmg, this.name, hitPart);
     }
 
     if (onBotFire) {

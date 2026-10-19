@@ -343,23 +343,68 @@ export class Player {
 
   async updateThirdPersonWeapon() {
     if (this.thirdPersonGunMesh) {
-      this.playerBodyGroup.remove(this.thirdPersonGunMesh);
+      if (this.thirdPersonGunMesh.parent) {
+        this.thirdPersonGunMesh.parent.remove(this.thirdPersonGunMesh);
+      } else {
+        this.playerBodyGroup.remove(this.thirdPersonGunMesh);
+      }
       this.thirdPersonGunMesh = null;
     }
     if (!this.activeWeapon) return;
 
     try {
+      const handBone = modelManager.findRightHandBone(this.bodyModel);
+
+      if (this.activeWeapon.id === 'knife') {
+        const knife = await modelManager.getThirdPersonKnifeModel();
+        if (knife) {
+          if (handBone) {
+            // Position knife in operative's right hand pointing forward
+            if (this.team === 'T') {
+              knife.position.set(0.04, 0.08, -0.04);
+              knife.rotation.set(-Math.PI / 2, 0, Math.PI / 2);
+            } else {
+              knife.position.set(0.03, 0.08, -0.04);
+              knife.rotation.set(-Math.PI / 2, 0, Math.PI / 2);
+            }
+            handBone.add(knife);
+          } else {
+            if (this.team === 'T') {
+              knife.position.set(-0.20, 1.05, -0.22);
+              knife.rotation.set(0, Math.PI / 2, 0);
+            } else {
+              knife.position.set(0.20, 1.05, 0.22);
+              knife.rotation.set(0, -Math.PI / 2, 0);
+            }
+            this.playerBodyGroup.add(knife);
+          }
+          this.thirdPersonGunMesh = knife;
+        }
+        return;
+      }
+
       const gun = await modelManager.getWeaponModel(this.activeWeapon.id);
       if (gun) {
         gun.scale.setScalar(0.7);
-        if (this.team === 'T') {
-          gun.position.set(-0.22, 1.15, -0.28);
-          gun.rotation.set(0, Math.PI / 2, 0);
+        if (handBone) {
+          if (this.team === 'T') {
+            gun.position.set(0.04, 0.08, -0.06);
+            gun.rotation.set(-Math.PI / 2, Math.PI / 2, 0);
+          } else {
+            gun.position.set(0.04, 0.08, -0.06);
+            gun.rotation.set(-Math.PI / 2, Math.PI / 2, 0);
+          }
+          handBone.add(gun);
         } else {
-          gun.position.set(0.22, 1.15, 0.28);
-          gun.rotation.set(0, -Math.PI / 2, 0);
+          if (this.team === 'T') {
+            gun.position.set(-0.22, 1.15, -0.28);
+            gun.rotation.set(0, Math.PI / 2, 0);
+          } else {
+            gun.position.set(0.22, 1.15, 0.28);
+            gun.rotation.set(0, -Math.PI / 2, 0);
+          }
+          this.playerBodyGroup.add(gun);
         }
-        this.playerBodyGroup.add(gun);
         this.thirdPersonGunMesh = gun;
       }
     } catch (e) {
@@ -559,6 +604,16 @@ export class Player {
         soundManager[this.activeWeapon.sound]();
       }
 
+      if (this.thirdPersonGunMesh && this.isThirdPerson) {
+        const origRot = this.thirdPersonGunMesh.rotation.x;
+        this.thirdPersonGunMesh.rotation.x += (Math.random() > 0.5 ? 0.75 : -0.75);
+        setTimeout(() => {
+          if (this.thirdPersonGunMesh) {
+            this.thirdPersonGunMesh.rotation.x = origRot;
+          }
+        }, 140);
+      }
+
       this.performRaycastShot();
       this.triggerStatsChange();
       return;
@@ -634,27 +689,44 @@ export class Player {
     if (this.isDead) return;
 
     let dmg = amount;
-    if (this.armor > 0) {
-      const absorbed = dmg * 0.5;
-      this.armor = Math.max(0, this.armor - absorbed);
-      dmg -= absorbed;
+    const isHeadshot = hitType === 'head';
+
+    if (isHeadshot) {
+      soundManager.playHeadshotDink();
+      if (this.hasHelmet) {
+        // Helmet absorbs 50% damage and takes 30 durability wear
+        dmg = Math.round(dmg * 0.5);
+        this.armor = Math.max(0, this.armor - 30);
+      } else {
+        // Lethal unarmored headshot multiplier
+        dmg = Math.round(dmg * 1.5);
+      }
+    } else if (hitType === 'body') {
+      if (this.armor > 0) {
+        const absorbed = dmg * 0.5;
+        this.armor = Math.max(0, this.armor - absorbed);
+        dmg -= absorbed;
+      }
+    } else if (hitType === 'legs') {
+      // Limb damage
+      dmg = Math.round(dmg * 0.75);
     }
 
-    this.health = Math.max(0, this.health - dmg);
+    this.health = Math.max(0, this.health - Math.round(dmg));
     soundManager.playHitmarker();
 
     if (this.health <= 0) {
-      this.die(attackerName);
+      this.die(attackerName, isHeadshot);
     }
     this.triggerStatsChange();
   }
 
-  die(killerName) {
+  die(killerName, isHeadshot = false) {
     this.isDead = true;
     this.health = 0;
     soundManager.playRoundLost();
     if (this.onKill) {
-      this.onKill(killerName, 'Player', false);
+      this.onKill(killerName, 'Player', isHeadshot);
     }
   }
 
