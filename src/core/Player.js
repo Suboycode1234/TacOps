@@ -982,10 +982,14 @@ export class Player {
     if (segments && segments.length > 0) {
       for (let i = 0; i < segments.length; i++) {
         const w = segments[i];
-        if (pos.y + 1.8 <= w.minY || pos.y + stepHeight >= w.maxY) continue;
+        const minY = w.minY !== undefined ? w.minY : (w.yMin !== undefined ? w.yMin : -10);
+        const maxY = w.maxY !== undefined ? w.maxY : (w.yMax !== undefined ? w.yMax : 10);
+        if (pos.y + 1.8 <= minY || pos.y + stepHeight >= maxY) continue;
 
-        const x1 = w.p1[0], z1 = w.p1[1];
-        const x2 = w.p2[0], z2 = w.p2[1];
+        const x1 = w.p1 ? w.p1[0] : (w.x1 !== undefined ? w.x1 : 0);
+        const z1 = w.p1 ? w.p1[1] : (w.z1 !== undefined ? w.z1 : 0);
+        const x2 = w.p2 ? w.p2[0] : (w.x2 !== undefined ? w.x2 : 0);
+        const z2 = w.p2 ? w.p2[1] : (w.z2 !== undefined ? w.z2 : 0);
         const dx = x2 - x1, dz = z2 - z1;
         const lenSq = dx * dx + dz * dz;
         const t = Math.max(0, Math.min(1, ((pos.x - x1) * dx + (pos.z - z1) * dz) / lenSq));

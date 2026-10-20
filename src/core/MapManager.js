@@ -32,7 +32,7 @@ export class MapManager {
     this.buyZoneT = { minX: -26, maxX: 8, minZ: 14, maxZ: 28 };
     this.mapBounds = { minX: -23.5, maxX: 47.5, minZ: -80.0, maxZ: 26.5, voidY: -4.5 };
 
-    this.currentMapId = 'cs16'; // 'cs16' or 'csgo'
+    this.currentMapId = 'cs2'; // 'cs16' or 'csgo'
     this.mapLoaded = false;
     this.onMapLoaded = null;
 
@@ -46,7 +46,7 @@ export class MapManager {
     this.scene.add(this.propsGroup);
 
     this.setupLighting();
-    this.loadMap('cs16');
+    this.loadMap('cs2');
   }
 
   setupLighting() {
@@ -135,15 +135,23 @@ export class MapManager {
     // 1. Dispose old terrain geometry and meshes
     while (this.mapGroup.children.length > 0) {
       const child = this.mapGroup.children[0];
-      if (child.geometry) child.geometry.dispose();
       this.mapGroup.remove(child);
+      if (child.geometry) child.geometry.dispose();
+      if (child.material) {
+        if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+        else child.material.dispose();
+      }
     }
 
     // 2. Dispose old props and targets
     while (this.propsGroup.children.length > 0) {
       const child = this.propsGroup.children[0];
-      if (child.geometry) child.geometry.dispose();
       this.propsGroup.remove(child);
+      if (child.geometry) child.geometry.dispose();
+      if (child.material) {
+        if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+        else child.material.dispose();
+      }
     }
 
     this.targets = [];
@@ -258,8 +266,11 @@ export class MapManager {
         }
 
         const texture = this.getTexture(mData.textureName || texKey);
+        const isDevMeasure = texKey.includes('DEV_MEASUREGENERIC01');
+        const fallbackColor = texKey.includes('01B') ? 0x484d54 : 0xdd7d28;
         const mat = new THREE.MeshStandardMaterial({
           map: texture,
+          color: isDevMeasure ? fallbackColor : 0xffffff,
           roughness: 0.85,
           metalness: 0.05,
           side: THREE.DoubleSide,

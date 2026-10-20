@@ -41,7 +41,7 @@ const mapCardCs16 = document.getElementById('map-card-cs16');
 const mapCardCs2 = document.getElementById('map-card-cs2') || document.getElementById('map-card-csgo');
 const mapPill = document.getElementById('map-pill');
 const openMapBtn = document.getElementById('open-map-btn');
-let currentMap = 'cs16';
+let currentMap = 'cs2';
 
 
 // Team Select Elements
@@ -256,6 +256,7 @@ if (mapPill) mapPill.addEventListener('click', () => selectMap(currentMap === 'c
 if (openMapBtn) openMapBtn.addEventListener('click', () => selectMap(currentMap === 'cs16' ? 'cs2' : 'cs16'));
 
 game.onMapChanged = (mapId) => updateMapUI(mapId);
+updateMapUI(currentMap);
 
 
 openTeamBtn.addEventListener('click', () => {

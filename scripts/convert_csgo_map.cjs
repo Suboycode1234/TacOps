@@ -140,7 +140,7 @@ for (let i = 0; i < numFaces; i++) {
 
   let cleanName = 'DEV_MEASUREGENERIC01';
   if (rawName.includes('DEV_MEASUREGENERIC01B')) cleanName = 'DEV_MEASUREGENERIC01B';
-  else if (rawName.includes('TOOLSSKYBOX')) cleanName = 'DEV_MEASUREGENERIC01'; // enclose room with dev measure texture
+  else if (rawName.includes('TOOLSSKYBOX')) cleanName = 'DEV_MEASUREGENERIC01';
 
   const polyVerts = [];
   for (let e = 0; e < numedges; e++) {
@@ -151,7 +151,6 @@ for (let i = 0; i < numFaces; i++) {
   if (polyVerts.length < 3) continue;
   const threeVerts = polyVerts.map(v => csToThree(v[0], v[1], v[2]));
 
-  // Track bounds on visible geometry
   for (const p of threeVerts) {
     if (p[0] < minX) minX = p[0]; if (p[0] > maxX) maxX = p[0];
     if (p[1] < minY) minY = p[1]; if (p[1] > maxY) maxY = p[1];
@@ -215,7 +214,7 @@ for (let i = 0; i < numFaces; i++) {
     }
   }
 
-  // Wall segments (vertical barriers)
+  // Wall segments with exact p1, p2, minY, maxY, nx, nz matching Player & BotManager
   if (Math.abs(ny) < 0.3) {
     for (let e = 0; e < threeVerts.length; e++) {
       const vA = threeVerts[e];
@@ -225,9 +224,16 @@ for (let i = 0; i < numFaces; i++) {
       const segLen = Math.hypot(dX, dZ);
       if (segLen > 0.3) {
         wallSegments.push({
-          x1: vA[0], z1: vA[2], x2: vB[0], z2: vB[2],
-          yMin: Math.min(vA[1], vB[1]) - 0.5,
-          yMax: Math.max(vA[1], vB[1]) + 4.0
+          p1: [vA[0], vA[2]],
+          p2: [vB[0], vB[2]],
+          minY: Math.min(vA[1], vB[1]) - 0.5,
+          maxY: Math.max(vA[1], vB[1]) + 4.0,
+          nx: nx,
+          nz: nz,
+          x1: vA[0],
+          z1: vA[2],
+          x2: vB[0],
+          z2: vB[2]
         });
       }
     }
@@ -279,12 +285,10 @@ const mapOutput = {
   colliders: colliders
 };
 
-// Write both csgo and cs2 paths for backwards compatibility and forward switch
 fs.writeFileSync('H:/Tacops-Full/public/models/Maps/Dust2/dust2_largo_csgo.json', JSON.stringify(mapOutput, null, 2));
 fs.writeFileSync('H:/Tacops-Full/public/models/Maps/Dust2/dust2_largo_cs2.json', JSON.stringify(mapOutput, null, 2));
 
 console.log('[CS2 Map Converter] Successfully written dust2_largo_csgo.json and dust2_largo_cs2.json');
 console.log('[CS2 Map Converter] Meshes:', Object.keys(textureMeshes));
 console.log('[CS2 Map Converter] Floor Triangles:', floorTriangles.length);
-console.log('[CS2 Map Converter] Wall Segments:', wallSegments.length);
-console.log('[CS2 Map Converter] Bounds:', mapOutput.bounds);
+console.log('[CS2 Map Converter] Wall Segments with p1/p2:', wallSegments.length);
