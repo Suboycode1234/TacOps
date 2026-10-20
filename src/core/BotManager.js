@@ -183,10 +183,7 @@ export class Bot {
     this.holdLookTarget = null;
 
     // Tactical Multi-Route Navigation
-    const isCS2 = this.mapManager && (this.mapManager.currentMapId === 'cs2' || this.mapManager.currentMapId === 'csgo');
-    const routePool = isCS2
-      ? (this.team === 'T' ? CS2_T_ROUTES : CS2_CT_ROUTES)
-      : (this.team === 'T' ? T_ROUTES : CT_ROUTES);
+    const routePool = this.team === 'T' ? T_ROUTES : CT_ROUTES;
     this.route = routePool[routeIdx % routePool.length];
     this.routeDirection = 1; // 1 = forward, -1 = reverse
     this.currentWaypointIdx = 0;

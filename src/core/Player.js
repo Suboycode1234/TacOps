@@ -738,10 +738,7 @@ export class Player {
     this.velocity.set(0, 0, 0);
     this.yawObject.position.copy(spawnPos);
     this.pitchObject.rotation.set(0, 0, 0);
-    if (this.mapManager && (this.mapManager.currentMapId === 'cs2' || this.mapManager.currentMapId === 'csgo')) {
-      const toCenter = new THREE.Vector3(0, 0, 0).sub(spawnPos);
-      this.yawObject.rotation.y = Math.atan2(-toCenter.x, -toCenter.z);
-    }
+
     this.isReloading = false;
     if (!this.bodyModel || this.lastLoadedTeam !== this.team) {
       this.loadPlayerBodyModel();

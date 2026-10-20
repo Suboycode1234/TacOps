@@ -307,17 +307,11 @@ export class MapManager {
   }
 
   createShootingTargets() {
-    const targetPositions = (this.currentMapId === 'cs2' || this.currentMapId === 'csgo')
-      ? [
-          new THREE.Vector3(0, 0.45, 0),
-          new THREE.Vector3(3.5, 0.45, 4.0),
-          new THREE.Vector3(-3.5, 0.45, -4.0),
-        ]
-      : [
-          new THREE.Vector3(14, 0.5, -24), // Pit
-          new THREE.Vector3(10, 2.5, -34), // A ramp
-          new THREE.Vector3(6, 2.2, -6),   // Long corner
-        ];
+    const targetPositions = [
+      new THREE.Vector3(14, 0.5, -24), // Pit
+      new THREE.Vector3(10, 2.5, -34), // A ramp
+      new THREE.Vector3(6, 2.2, -6),   // Long corner
+    ];
 
     const targetMat = this.createBullseyeMaterial();
 
@@ -394,13 +388,12 @@ export class MapManager {
       depthWrite: false,
       blending: THREE.AdditiveBlending,
     });
-    const isCSGO = (this.currentMapId === 'cs2' || this.currentMapId === 'csgo');
     const ctMesh = new THREE.Mesh(ctGeo, ctMat);
     ctMesh.rotation.x = -Math.PI / 2;
-    ctMesh.position.set(isCSGO ? 4.5 : 10, isCSGO ? 0.46 : 2.46, isCSGO ? -4.5 : -44);
+    ctMesh.position.set(10, 2.46, -44);
     this.propsGroup.add(ctMesh);
 
-    const tGeo = new THREE.RingGeometry(isCSGO ? 2.5 : 3.5, isCSGO ? 2.8 : 3.8, 32);
+    const tGeo = new THREE.RingGeometry(3.5, 3.8, 32);
     const tMat = new THREE.MeshBasicMaterial({
       color: 0xe63946,
       transparent: true,
@@ -411,7 +404,7 @@ export class MapManager {
     });
     const tMesh = new THREE.Mesh(tGeo, tMat);
     tMesh.rotation.x = -Math.PI / 2;
-    tMesh.position.set(isCSGO ? -4.5 : -18, isCSGO ? 0.46 : 3.27, isCSGO ? 4.5 : 21);
+    tMesh.position.set(-18, 3.27, 21);
     this.propsGroup.add(tMesh);
   }
 
@@ -445,13 +438,6 @@ export class MapManager {
 
   // Calculate elevation / floor level at any coordinate (x, z)
   getGroundHeight(x, z, currentY = 0) {
-    if (this.currentMapId === 'cs2' || this.currentMapId === 'csgo') {
-      const b = this.mapBounds || { minX: -8.5, maxX: 8.5, minZ: -14.5, maxZ: 14.5 };
-      if (x >= b.minX - 0.5 && x <= b.maxX + 0.5 && z >= b.minZ - 0.5 && z <= b.maxZ + 0.5) {
-        return 0.4064; // Exact floor level of official CS2 .bin map
-      }
-    }
-
     if (!this.floorTriangles || this.floorTriangles.length === 0) {
       return 0;
     }
