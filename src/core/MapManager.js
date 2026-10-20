@@ -114,6 +114,7 @@ export class MapManager {
         loaded.wrapS = THREE.RepeatWrapping;
         loaded.wrapT = THREE.RepeatWrapping;
         loaded.colorSpace = THREE.SRGBColorSpace;
+        loaded.anisotropy = 8;
         loaded.needsUpdate = true;
       },
       undefined,
@@ -142,6 +143,7 @@ export class MapManager {
         loaded.wrapS = THREE.RepeatWrapping;
         loaded.wrapT = THREE.RepeatWrapping;
         loaded.colorSpace = THREE.SRGBColorSpace;
+        loaded.anisotropy = 8;
         loaded.needsUpdate = true;
       },
       undefined,
@@ -410,16 +412,17 @@ export class MapManager {
 
             const name = (c.name || '').toLowerCase();
 
-            // Occlusion filter: NEVER filter out blacktop / roads / floors!
+            // Occlusion filter: Cleanly hide true occluders, never roads or floors
             const isOccluder = (
               name.includes('blocklight') ||
               name.includes('shadow') ||
-              name.includes('mesh_overlay') ||
-              name.includes('toolsblack') ||
-              name.includes('nodraw') ||
+              name.includes('overlay') ||
+              name.includes('black_simple') ||
+              name.includes('mat0_black') ||
               name.includes('agg10_8_black') ||
-              name.includes('mat0_black')
-            ) && !name.includes('blacktop');
+              name.includes('toolsblack') ||
+              name.includes('nodraw')
+            ) && !name.includes('blacktop') && !name.includes('ground') && !name.includes('floor');
 
             if (isOccluder) {
               c.visible = false;
