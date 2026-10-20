@@ -42,6 +42,7 @@ export class Game {
     // Match / Round State
     this.roundTime = 115;
     this.currentTimer = this.roundTime;
+    this.currentMapId = 'cs16';
     this.currentRound = 1;
     this.ctScore = 0;
     this.tScore = 0;
@@ -56,6 +57,7 @@ export class Game {
     this.onUIUpdate = null;
     this.onKillFeed = null;
     this.onRoundEnd = null;
+    this.onMapChanged = null;
 
     this.setupShootingHooks();
     this.startRound();
@@ -63,6 +65,16 @@ export class Game {
     window.addEventListener('resize', () => this.onWindowResize());
     this.animate = this.animate.bind(this);
     requestAnimationFrame(this.animate);
+  }
+
+  async switchMap(mapId) {
+    if (this.currentMapId === mapId && this.mapManager.mapLoaded) return;
+    this.currentMapId = mapId;
+    await this.mapManager.loadMap(mapId);
+    this.startRound();
+    if (this.onMapChanged) {
+      this.onMapChanged(mapId);
+    }
   }
 
   setPlayerTeam(team) {

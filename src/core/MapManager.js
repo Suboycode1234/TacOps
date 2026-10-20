@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+﻿import * as THREE from 'three';
 
 export class MapManager {
   constructor(scene) {
@@ -31,13 +31,21 @@ export class MapManager {
     this.buyZoneCT = { minX: 4, maxX: 16, minZ: -56, maxZ: -36 };
     this.buyZoneT = { minX: -26, maxX: 8, minZ: 14, maxZ: 28 };
 
+    this.currentMapId = 'cs16'; // 'cs16' or 'csgo'
     this.mapLoaded = false;
+    this.onMapLoaded = null;
+
+    // Groups
     this.mapGroup = new THREE.Group();
-    this.mapGroup.name = 'Dust2_Largo_Map';
+    this.mapGroup.name = 'Dust2_Terrain_Group';
     this.scene.add(this.mapGroup);
 
+    this.propsGroup = new THREE.Group();
+    this.propsGroup.name = 'Dust2_Props_Group';
+    this.scene.add(this.propsGroup);
+
     this.setupLighting();
-    this.loadDust2Map();
+    this.loadMap('cs16');
   }
 
   setupLighting() {
@@ -106,7 +114,6 @@ export class MapManager {
       },
       undefined,
       () => {
-        // Fallback procedural texture if specific file is missing
         console.warn(`Texture ${url} missing, applying sand fallback`);
       }
     );
@@ -117,9 +124,35 @@ export class MapManager {
     return tex;
   }
 
-  async loadDust2Map() {
+  async loadMap(mapId = 'cs16') {
+    this.currentMapId = mapId;
+    this.mapLoaded = false;
+
+    // 1. Dispose old terrain geometry and meshes
+    while (this.mapGroup.children.length > 0) {
+      const child = this.mapGroup.children[0];
+      if (child.geometry) child.geometry.dispose();
+      this.mapGroup.remove(child);
+    }
+
+    // 2. Dispose old props and targets
+    while (this.propsGroup.children.length > 0) {
+      const child = this.propsGroup.children[0];
+      if (child.geometry) child.geometry.dispose();
+      this.propsGroup.remove(child);
+    }
+
+    this.targets = [];
+    this.colliders = [];
+    this.wallSegments = [];
+    this.floorTriangles = [];
+
+    const mapJsonUrl = mapId === 'csgo'
+      ? '/models/Maps/Dust2/dust2_largo_csgo.json'
+      : '/models/Maps/Dust2/dust2_largo.json';
+
     try {
-      const res = await fetch('/models/Maps/Dust2/dust2_largo.json');
+      const res = await fetch(mapJsonUrl);
       if (!res.ok) throw new Error(`HTTP error ${res.status}`);
       const data = await res.json();
 
@@ -133,26 +166,36 @@ export class MapManager {
         }
       }
 
-      // 2. Floor Triangles for Elevation Queries
+      // 2. Floor Triangles for Elevation Queries & Slope Walking
       if (data.floorTriangles) {
         this.floorTriangles = data.floorTriangles;
       }
 
-      // 3. Wall Segments and Collision Boxes
+      // 3. Wall Segments for Circle-to-Line Continuous Collision
       if (data.wallSegments) {
         this.wallSegments = data.wallSegments;
       }
+
+      // 4. Colliders for 3D Prop & Box Collision
       if (data.colliders) {
         for (const c of data.colliders) {
-          const box = new THREE.Box3(
-            new THREE.Vector3(c.min[0], c.min[1], c.min[2]),
-            new THREE.Vector3(c.max[0], c.max[1], c.max[2])
-          );
+          const box = new THREE.Box3();
+          if (c.min && c.max) {
+            box.set(
+              new THREE.Vector3(c.min[0], c.min[1], c.min[2]),
+              new THREE.Vector3(c.max[0], c.max[1], c.max[2])
+            );
+          } else if (c.sx !== undefined) {
+            box.set(
+              new THREE.Vector3(c.x - c.sx / 2, c.y - c.sy / 2, c.z - c.sz / 2),
+              new THREE.Vector3(c.x + c.sx / 2, c.y + c.sy / 2, c.z + c.sz / 2)
+            );
+          }
           this.colliders.push({ box });
         }
       }
 
-      // 4. Construct 3D Geometry for each texture group
+      // 5. Construct 3D Geometry for each texture group
       const meshesData = data.meshes || {};
       for (const [texKey, mData] of Object.entries(meshesData)) {
         if (!mData.positions || mData.positions.length === 0) continue;
@@ -162,10 +205,14 @@ export class MapManager {
         if (mData.uvs && mData.uvs.length > 0) {
           geo.setAttribute('uv', new THREE.Float32BufferAttribute(mData.uvs, 2));
         }
+        if (mData.normals && mData.normals.length > 0) {
+          geo.setAttribute('normal', new THREE.Float32BufferAttribute(mData.normals, 3));
+        } else {
+          geo.computeVertexNormals();
+        }
         if (mData.indices && mData.indices.length > 0) {
           geo.setIndex(mData.indices);
         }
-        geo.computeVertexNormals();
 
         const texture = this.getTexture(mData.textureName || texKey);
         const mat = new THREE.MeshStandardMaterial({
@@ -178,26 +225,34 @@ export class MapManager {
         const mesh = new THREE.Mesh(geo, mat);
         mesh.castShadow = false;
         mesh.receiveShadow = true;
-        mesh.name = `Dust2_${texKey}`;
+        mesh.name = `Dust2_${mapId}_${texKey}`;
         this.mapGroup.add(mesh);
       }
 
-      // 5. Tactical interactive targets
+      // 6. Tactical interactive shooting targets
       this.createShootingTargets();
 
-      // 6. Buy zone visual decals
+      // 7. Buy zone visual decals
       this.createBuyZoneDecals();
 
       this.mapLoaded = true;
-      console.log('Dust II Largo successfully loaded with', Object.keys(meshesData).length, 'texture meshes and', this.colliders.length, 'colliders.');
+      console.log(`[MapManager] ${mapId === 'csgo' ? 'CS:GO Edition' : 'CS 1.6 Classic'} map loaded: ${Object.keys(meshesData).length} meshes, ${this.floorTriangles.length} floors, ${this.wallSegments.length} wall segments.`);
+
+      if (this.onMapLoaded) {
+        this.onMapLoaded(mapId);
+      }
     } catch (e) {
-      console.error('Failed to load Dust 2 map, falling back to procedural ground:', e);
+      console.error(`Failed to load map ${mapId}, falling back to procedural ground:`, e);
       this.createFallbackGround();
     }
   }
 
+  // Backward compatible alias
+  async loadDust2Map() {
+    return this.loadMap(this.currentMapId || 'cs16');
+  }
+
   createShootingTargets() {
-    // Interactive targets along Long A for warm-up shooting
     const targetPositions = [
       new THREE.Vector3(14, 0.5, -24), // Pit
       new THREE.Vector3(10, 2.5, -34), // A ramp
@@ -206,12 +261,12 @@ export class MapManager {
 
     const targetMat = this.createBullseyeMaterial();
 
-    targetPositions.forEach((pos, idx) => {
+    targetPositions.forEach((pos) => {
       const poleGeo = new THREE.CylinderGeometry(0.06, 0.06, 1.6, 8);
       const poleMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
       const pole = new THREE.Mesh(poleGeo, poleMat);
       pole.position.set(pos.x, pos.y + 0.8, pos.z);
-      this.scene.add(pole);
+      this.propsGroup.add(pole);
 
       const targetGroup = new THREE.Group();
       targetGroup.position.set(pos.x, pos.y + 1.6, pos.z);
@@ -229,7 +284,7 @@ export class MapManager {
         hitCount: 0,
       };
 
-      this.scene.add(targetGroup);
+      this.propsGroup.add(targetGroup);
       this.targets.push(targetGroup);
     });
   }
@@ -270,7 +325,6 @@ export class MapManager {
   }
 
   createBuyZoneDecals() {
-    // Subtle CT Buy Zone Decal with additive blending so sand textures show clearly
     const ctGeo = new THREE.RingGeometry(3.5, 3.8, 32);
     const ctMat = new THREE.MeshBasicMaterial({
       color: 0x3a86ff,
@@ -283,9 +337,8 @@ export class MapManager {
     const ctMesh = new THREE.Mesh(ctGeo, ctMat);
     ctMesh.rotation.x = -Math.PI / 2;
     ctMesh.position.set(10, 2.46, -44);
-    this.scene.add(ctMesh);
+    this.propsGroup.add(ctMesh);
 
-    // Subtle T Buy Zone Decal
     const tGeo = new THREE.RingGeometry(3.5, 3.8, 32);
     const tMat = new THREE.MeshBasicMaterial({
       color: 0xe63946,
@@ -298,7 +351,7 @@ export class MapManager {
     const tMesh = new THREE.Mesh(tGeo, tMat);
     tMesh.rotation.x = -Math.PI / 2;
     tMesh.position.set(-18, 3.27, 21);
-    this.scene.add(tMesh);
+    this.propsGroup.add(tMesh);
   }
 
   createFallbackGround() {
@@ -307,7 +360,7 @@ export class MapManager {
     const ground = new THREE.Mesh(geo, mat);
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
-    this.scene.add(ground);
+    this.mapGroup.add(ground);
   }
 
   // Exact polygon point test with generous seam tolerance
@@ -348,7 +401,6 @@ export class MapManager {
           y = -(f.nx * x + f.nz * z + f.d) / f.ny;
         }
 
-        // Prioritize the highest floor beneath current position (or within step up height)
         if (y <= currentY + 0.65) {
           if (y > bestY) bestY = y;
         }
@@ -391,8 +443,7 @@ export class MapManager {
 
     if (bestY !== -Infinity) return bestY;
 
-    // 4. Over open void or abyss: return -10.0 so gravity pulls player down naturally
-    // NEVER return currentY because returning currentY freezes the player in mid-air!
+    // 4. Over open void or abyss: return -10.0 so gravity pulls player down naturally to safety net
     return -10.0;
   }
 

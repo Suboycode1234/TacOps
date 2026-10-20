@@ -37,6 +37,7 @@ The following bugs and feature requests are actively prioritized:
 - [ ] **Weapon Damage Scaling**: Lack of damage falloff curves over long distances.
 - [ ] **Scoped Weapons Zoom Overlay**: Scoped weapons currently lack specialized optical reticle overlays.
 - [x] **Hitbox / Body Part Damage Scaling**: Implemented full body part damage scaling across Head (3.5x - 4x), Torso (1.0x), and Limbs (0.75x) with helmet and armor absorption. *(Note: Latest feature, not fully tested and may be nonfunctional)*.
+- [x] **Operational Map Selector (CS 1.6 vs CS:GO)**: Interactive in-game deployment selector allowing players to switch between **Dust II Largo (CS 1.6 Classic)** and **Dust II Largo (CS:GO Edition)** with unified BSP wall segment collision, 916 floor mesh polygons, and void fall safety nets. *(Note: Latest feature, not fully tested and may be nonfunctional)*.
 
 ---
 

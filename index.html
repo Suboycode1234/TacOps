@@ -68,6 +68,7 @@
 
       <!-- Money & Buy Zone Indicator -->
       <div id="hud-center">
+        <div id="map-pill" style="font-size: 11px; color: #ffb703; background: rgba(255, 170, 0, 0.12); border: 1px solid rgba(255, 170, 0, 0.35); padding: 3px 10px; border-radius: 12px; letter-spacing: 1px; font-weight: 700; cursor: pointer;">MAP: CS 1.6 [F2]</div>
         <div id="view-mode-pill" style="font-size: 11px; color: #8b949e; background: rgba(255,255,255,0.08); padding: 3px 10px; border-radius: 12px; letter-spacing: 1px; font-weight: 700; cursor: pointer;">VIEW: 1ST PERSON [V]</div>
         <div id="buy-zone-indicator">🛒 BUY ZONE (PRESS B)</div>
         <div id="money-card">
@@ -105,6 +106,46 @@
           </div>
           <div class="team-select-title">SELECT YOUR FACTION</div>
           <div class="team-select-subtitle">CHOOSE YOUR SIDE FOR THE ENGAGEMENT (PRESS 1 OR 2)</div>
+        </div>
+
+        
+        <!-- Operational Map Selector (CS 1.6 vs CS:GO) -->
+        <div class="map-selector-section">
+          <div class="map-selector-header">
+            <span class="map-section-title">DEPLOYMENT MAP VARIANT</span>
+            <span class="map-section-hint">HOTKEYS: [F1] CS 1.6 • [F2] CS:GO</span>
+          </div>
+          <div class="map-cards-grid">
+            <!-- 1. CS 1.6 Classic Card -->
+            <div class="map-card active" id="map-card-cs16" data-map="cs16">
+              <div class="map-card-glow"></div>
+              <div class="map-card-top">
+                <span class="map-badge cs16">VALVE 2005 GOLDSRC</span>
+                <span class="map-selected-tag">ACTIVE MAP</span>
+              </div>
+              <div class="map-card-name">Dust II Largo (CS 1.6 Classic)</div>
+              <div class="map-card-desc">Authentic original brushwork with classic 1.6 textures, desert skybox, and original chokepoints.</div>
+              <div class="map-card-footer">
+                <span class="map-spec">687 Floor Triangles</span>
+                <span class="map-spec">444 Wall Segments</span>
+              </div>
+            </div>
+
+            <!-- 2. CS:GO Edition Card -->
+            <div class="map-card" id="map-card-csgo" data-map="csgo">
+              <div class="map-card-glow"></div>
+              <div class="map-card-top">
+                <span class="map-badge csgo">VALVE SOURCE ENGINE</span>
+                <span class="map-selected-tag">ACTIVE MAP</span>
+              </div>
+              <div class="map-card-name">Dust II Largo (CS:GO Edition)</div>
+              <div class="map-card-desc">Modern Source engine adaptation with refined brushwork, 716 wall colliders, and 916 floor polygons.</div>
+              <div class="map-card-footer">
+                <span class="map-spec">916 Floor Triangles</span>
+                <span class="map-spec">716 Wall Segments</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="team-cards-grid">
@@ -313,6 +354,7 @@
 
         <div style="display: flex; gap: 12px; justify-content: center;">
           <button class="resume-btn" id="resume-btn">DEPLOY / RESUME</button>
+          <button class="resume-btn" id="open-map-btn" style="background: rgba(255, 183, 3, 0.2); color: #ffb703; border: 1px solid rgba(255, 183, 3, 0.5);">SWITCH MAP: CS:GO (F2)</button>
           <button class="resume-btn" id="open-team-btn" style="background: rgba(255, 255, 255, 0.15); color: #fff;">CHANGE TEAM (M)</button>
         </div>
       </div>
