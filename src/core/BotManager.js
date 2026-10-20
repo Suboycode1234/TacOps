@@ -336,8 +336,7 @@ export class Bot {
         }
 
         model.scale.multiplyScalar(this.scaleMultiplier);
-        // Rotate 180 degrees so native backwards FBX model faces forward in direction of travel!
-        model.rotation.y = Math.PI;
+        // Model orientation aligned with bot group facing forward
         this.model = model;
         this.group.add(model);
 
