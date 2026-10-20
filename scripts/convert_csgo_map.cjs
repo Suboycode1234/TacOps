@@ -1,7 +1,7 @@
 ﻿const fs = require('fs');
 const path = require('path');
 
-const bspPath = 'H:/TacopsModels/Maps/Dust II/de_dust2_largo-master/csgo/maps/de_dust2_largo.bsp';
+const bspPath = 'H:/TacopsModels/Maps/Dust II/Dust2CSGO/de_dust2_fps-main/extracted/de_dust2_fps.bsp';
 const bspBuf = fs.readFileSync(bspPath);
 
 function getLump(id) {
@@ -133,14 +133,8 @@ for (let i = 0; i < numFaces; i++) {
     continue;
   }
 
-  // Normalize texture key to match local textures
   const texBase = path.basename(rawTexName);
   let cleanTexKey = texBase;
-  const existingFiles = fs.readdirSync('H:/Tacops-Full/public/models/Maps/Dust2/textures');
-  const matched = existingFiles.find(f => f.toLowerCase() === (texBase.toLowerCase() + '.png'));
-  if (matched) {
-    cleanTexKey = matched.replace(/\.png$/i, '');
-  }
 
   const polyVerts = [];
   for (let e = 0; e < numedges; e++) {
@@ -281,7 +275,15 @@ for (const c of rawColliders) {
 const colliders = [...uniqueMap.values()];
 
 const outMap = {
-  name: 'de_dust2_largo_csgo',
+  name: 'de_dust2_csgo_fps',
+  source: 'Dust2CSGO/de_dust2_fps-main/extracted/de_dust2_fps.bsp',
+  bounds: {
+    minX: -74.0,
+    maxX: 74.0,
+    minZ: -100.0,
+    maxZ: 48.0,
+    voidY: -7.5
+  },
   spawns: {
     CT: ctSpawns,
     T: tSpawns
@@ -294,6 +296,6 @@ const outMap = {
 
 const outPath = 'H:/Tacops-Full/public/models/Maps/Dust2/dust2_largo_csgo.json';
 fs.writeFileSync(outPath, JSON.stringify(outMap));
-console.log(`Updated CSGO map JSON: ${outPath} (${(fs.statSync(outPath).size / 1024 / 1024).toFixed(2)} MB)`);
+console.log(`Successfully converted de_dust2_fps.bsp to ${outPath} (${(fs.statSync(outPath).size / 1024 / 1024).toFixed(2)} MB)`);
 console.log(`CT Spawns: ${ctSpawns.length}, T Spawns: ${tSpawns.length}`);
 console.log(`Meshes: ${Object.keys(textureMeshes).length}, Colliders: ${colliders.length}, WallSegments: ${wallSegments.length}, Floors: ${floorTriangles.length}`);

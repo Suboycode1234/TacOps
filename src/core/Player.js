@@ -843,12 +843,16 @@ export class Player {
 
     this.resolveCollisions(nextPos);
 
-    // Hard boundary clamping to Dust II walkable area
-    nextPos.x = Math.max(-23.5, Math.min(47.5, nextPos.x));
-    nextPos.z = Math.max(-80.0, Math.min(26.5, nextPos.z));
+    // Dynamic boundary clamping for selected map (CS 1.6 vs CS:GO)
+    const bounds = (this.mapManager && this.mapManager.mapBounds)
+      ? this.mapManager.mapBounds
+      : { minX: -23.5, maxX: 47.5, minZ: -80.0, maxZ: 26.5, voidY: -4.5 };
+
+    nextPos.x = Math.max(bounds.minX, Math.min(bounds.maxX, nextPos.x));
+    nextPos.z = Math.max(bounds.minZ, Math.min(bounds.maxZ, nextPos.z));
 
     // Void fall safety net: if falling below ground level or outside bounds, teleport to team spawn
-    if (nextPos.y < -4.5 || nextPos.x < -24.0 || nextPos.x > 48.0 || nextPos.z < -81.0 || nextPos.z > 27.5) {
+    if (nextPos.y < bounds.voidY || nextPos.x < bounds.minX - 1.0 || nextPos.x > bounds.maxX + 1.0 || nextPos.z < bounds.minZ - 1.0 || nextPos.z > bounds.maxZ + 1.0) {
       const safeSpawn = this.team === 'CT'
         ? (this.mapManager && this.mapManager.spawnPointsCT && this.mapManager.spawnPointsCT[0] ? this.mapManager.spawnPointsCT[0] : new THREE.Vector3(11.38, 2.44, -43.89))
         : (this.mapManager && this.mapManager.spawnPointsT && this.mapManager.spawnPointsT[0] ? this.mapManager.spawnPointsT[0] : new THREE.Vector3(-18.69, 3.25, 22.76));

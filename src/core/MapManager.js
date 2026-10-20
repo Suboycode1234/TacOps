@@ -30,6 +30,7 @@ export class MapManager {
 
     this.buyZoneCT = { minX: 4, maxX: 16, minZ: -56, maxZ: -36 };
     this.buyZoneT = { minX: -26, maxX: 8, minZ: 14, maxZ: 28 };
+    this.mapBounds = { minX: -23.5, maxX: 47.5, minZ: -80.0, maxZ: 26.5, voidY: -4.5 };
 
     this.currentMapId = 'cs16'; // 'cs16' or 'csgo'
     this.mapLoaded = false;
@@ -155,6 +156,23 @@ export class MapManager {
       const res = await fetch(mapJsonUrl);
       if (!res.ok) throw new Error(`HTTP error ${res.status}`);
       const data = await res.json();
+
+      // Set Map Bounds & Buy Zones
+      if (data.bounds) {
+        this.mapBounds = data.bounds;
+      } else if (mapId === 'csgo') {
+        this.mapBounds = { minX: -74.0, maxX: 74.0, minZ: -100.0, maxZ: 48.0, voidY: -7.5 };
+      } else {
+        this.mapBounds = { minX: -23.5, maxX: 47.5, minZ: -80.0, maxZ: 26.5, voidY: -4.5 };
+      }
+
+      if (mapId === 'csgo') {
+        this.buyZoneCT = { minX: 0, maxX: 16, minZ: -65, maxZ: -50 };
+        this.buyZoneT = { minX: -28, maxX: -6, minZ: 14, maxZ: 28 };
+      } else {
+        this.buyZoneCT = { minX: 4, maxX: 16, minZ: -56, maxZ: -36 };
+        this.buyZoneT = { minX: -26, maxX: 8, minZ: 14, maxZ: 28 };
+      }
 
       // 1. Spawns
       if (data.spawns) {

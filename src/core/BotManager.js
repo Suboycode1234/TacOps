@@ -623,13 +623,17 @@ export class Bot {
     this.resolveCollisions(botPos);
 
     // 2. Hard boundary clamping to Dust II walkable area
-    botPos.x = Math.max(-23.5, Math.min(47.5, botPos.x));
-    botPos.z = Math.max(-80.0, Math.min(26.5, botPos.z));
+    const bounds = (this.mapManager && this.mapManager.mapBounds)
+      ? this.mapManager.mapBounds
+      : { minX: -23.5, maxX: 47.5, minZ: -80.0, maxZ: 26.5, voidY: -4.5 };
+
+    botPos.x = Math.max(bounds.minX, Math.min(bounds.maxX, botPos.x));
+    botPos.z = Math.max(bounds.minZ, Math.min(bounds.maxZ, botPos.z));
 
     // 3. Ground bot to authentic Dust 2 map elevation with void step-back protection
     if (this.mapManager && this.mapManager.getGroundHeight) {
       const gh = this.mapManager.getGroundHeight(botPos.x, botPos.z, botPos.y);
-      if (gh > -4.5) {
+      if (gh > bounds.voidY) {
         botPos.y = gh;
         this.lastValidPos.copy(botPos);
       } else {
@@ -639,7 +643,7 @@ export class Bot {
     }
 
     // 4. Void fall safety net
-    if (botPos.y < -4.5 || botPos.x < -24.0 || botPos.x > 48.0 || botPos.z < -81.0 || botPos.z > 27.5) {
+    if (botPos.y < bounds.voidY || botPos.x < bounds.minX - 1.0 || botPos.x > bounds.maxX + 1.0 || botPos.z < bounds.minZ - 1.0 || botPos.z > bounds.maxZ + 1.0) {
       const safeSpawn = this.team === 'CT'
         ? (this.mapManager && this.mapManager.spawnPointsCT && this.mapManager.spawnPointsCT.length > 0
             ? this.mapManager.spawnPointsCT[0]
