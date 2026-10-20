@@ -1,7 +1,7 @@
 ﻿const fs = require('fs');
 const path = require('path');
 
-const bspPath = 'H:/TacopsModels/Maps/Dust II/Dust2CSGO/de_dust2_fps-main/extracted/de_dust2_fps.bsp';
+const bspPath = 'H:/TacopsModels/Maps/Dust II/Dust2CSGO/extracted_v2/de_dust2_csgo_new_v2.bsp';
 const bspBuf = fs.readFileSync(bspPath);
 
 function getLump(id) {
@@ -29,9 +29,9 @@ for (const b of entBlocks) {
   if (classMatch && originMatch) {
     const cls = classMatch[1];
     const [x, y, z] = originMatch[1].trim().split(/\s+/).map(Number);
-    if (cls === 'info_player_counterterrorist' || cls === 'info_player_start') {
+    if (cls === 'info_player_counterterrorist') {
       ctSpawns.push(csToThree(x, y, z));
-    } else if (cls === 'info_player_terrorist' || cls === 'info_player_deathmatch') {
+    } else if (cls === 'info_player_terrorist') {
       tSpawns.push(csToThree(x, y, z));
     }
   }
@@ -105,6 +105,28 @@ for (let i = 0; i < texInfoLump.len / 72; i++) {
 const faceLump = getLump(7);
 const numFaces = faceLump.len / 56;
 
+function mapRemakeTexture(rawName) {
+  const u = rawName.toUpperCase();
+  if (u.includes('TOOLSSKYBOX') || u.includes('TOOLSTRIGGER') || u.includes('TOOLSNODRAW') ||
+      u.includes('TOOLSINVISIBLE') || u.includes('TOOLSKIP') || u.includes('TOOLSHINT') ||
+      u.includes('TOOLSAREAPORTAL') || u.includes('TOOLSCLIP') || u.includes('TOOLSBLACK') ||
+      u.includes('ANTENNA_CARD') || u.includes('SATELLITE_DISH_CARD')) {
+    return null;
+  }
+
+  if (u.includes('DOOR') || u.includes('ROLLUP')) return 'SandWllDoor';
+  if (u.includes('WNDW') || u.includes('WINDOW')) return 'SandWllWndw';
+  if (u.includes('TRIM') || u.includes('CONCRETE') || u.includes('SIDEWALK')) return 'SandTrim';
+  if (u.includes('ROAD') || u.includes('ASPHALT') || u.includes('STONEGROUND') || u.includes('BRICKGROUND')) return 'SandRoad';
+  if (u.includes('SAND')) return '-0Sand';
+  if (u.includes('FLOORTILE') || u.includes('TILE')) return 'SandCCrete';
+  if (u.includes('CRATE') || u.includes('WOOD')) return 'MltryCrteSd2';
+  if (u.includes('PLASTER18') || u.includes('PLASTER19')) return 'csSandWallDJ1';
+  if (u.includes('PLASTER09') || u.includes('PLASTER15')) return 'csSandWallGH1a';
+  if (u.includes('PLASTER06') || u.includes('PLASTER05')) return 'csSandWallGH1b';
+  return '-0csSandWall';
+}
+
 const textureMeshes = {};
 const floorTriangles = [];
 const rawColliders = [];
@@ -123,18 +145,8 @@ for (let i = 0; i < numFaces; i++) {
   const tex = texNames[tInfo.texdata];
   if (!tex) continue;
 
-  const rawTexName = tex.name;
-  if (rawTexName.toUpperCase().includes('TOOLSSKYBOX') ||
-      rawTexName.toUpperCase().includes('TOOLSTRIGGER') ||
-      rawTexName.toUpperCase().includes('TOOLSNODRAW') ||
-      rawTexName.toUpperCase().includes('TOOLSINVISIBLE') ||
-      rawTexName.toUpperCase().includes('TOOLSKIP') ||
-      rawTexName.toUpperCase().includes('TOOLSHINT')) {
-    continue;
-  }
-
-  const texBase = path.basename(rawTexName);
-  let cleanTexKey = texBase;
+  const mappedTex = mapRemakeTexture(tex.name);
+  if (!mappedTex) continue;
 
   const polyVerts = [];
   for (let e = 0; e < numedges; e++) {
@@ -144,6 +156,12 @@ for (let i = 0; i < numFaces; i++) {
   }
 
   if (polyVerts.length < 3) continue;
+
+  const threeVerts = polyVerts.map(v => csToThree(v[0], v[1], v[2]));
+  const avgY = threeVerts.reduce((acc, p) => acc + p[1], 0) / threeVerts.length;
+
+  // Filter out extreme 3D skybox background faces (keep playable world)
+  if (avgY < -12 || avgY > 22) continue;
 
   const plane = planes[planenum];
   const csNx = side === 0 ? plane.x : -plane.x;
@@ -159,21 +177,20 @@ for (let i = 0; i < numFaces; i++) {
   const texW = (tex.w > 0) ? tex.w : 128;
   const texH = (tex.h > 0) ? tex.h : 128;
 
-  const threeVerts = polyVerts.map(v => csToThree(v[0], v[1], v[2]));
   const uvs = polyVerts.map(v => {
     const u = (v[0] * tInfo.s[0] + v[1] * tInfo.s[1] + v[2] * tInfo.s[2] + tInfo.s[3]) / texW;
     const tv = (v[0] * tInfo.t[0] + v[1] * tInfo.t[1] + v[2] * tInfo.t[2] + tInfo.t[3]) / texH;
     return [u, 1 - tv];
   });
 
-  if (!textureMeshes[cleanTexKey]) {
-    textureMeshes[cleanTexKey] = {
+  if (!textureMeshes[mappedTex]) {
+    textureMeshes[mappedTex] = {
       positions: [],
       normals: [],
       uvs: []
     };
   }
-  const meshData = textureMeshes[cleanTexKey];
+  const meshData = textureMeshes[mappedTex];
 
   for (let v = 1; v < threeVerts.length - 1; v++) {
     const pA = threeVerts[0];
@@ -184,6 +201,7 @@ for (let i = 0; i < numFaces; i++) {
     meshData.normals.push(nx, ny, nz, nx, ny, nz, nx, ny, nz);
     meshData.uvs.push(...uvs[0], ...uvs[v], ...uvs[v + 1]);
 
+    // Floor triangles (csNz > 0.15 => ground/ramps)
     if (csNz > 0.15) {
       const minX = Math.min(pA[0], pB[0], pC[0]);
       const maxX = Math.max(pA[0], pB[0], pC[0]);
@@ -275,14 +293,14 @@ for (const c of rawColliders) {
 const colliders = [...uniqueMap.values()];
 
 const outMap = {
-  name: 'de_dust2_csgo_fps',
-  source: 'Dust2CSGO/de_dust2_fps-main/extracted/de_dust2_fps.bsp',
+  name: 'de_dust2_csgo_new_v2',
+  source: 'Dust2CSGO/de_dust2_csgo_new_v2.rar -> de_dust2_csgo_new_v2.bsp',
   bounds: {
-    minX: -74.0,
-    maxX: 74.0,
-    minZ: -100.0,
-    maxZ: 48.0,
-    voidY: -7.5
+    minX: -112.0,
+    maxX: 80.0,
+    minZ: -113.0,
+    maxZ: 63.0,
+    voidY: -8.0
   },
   spawns: {
     CT: ctSpawns,
@@ -296,6 +314,6 @@ const outMap = {
 
 const outPath = 'H:/Tacops-Full/public/models/Maps/Dust2/dust2_largo_csgo.json';
 fs.writeFileSync(outPath, JSON.stringify(outMap));
-console.log(`Successfully converted de_dust2_fps.bsp to ${outPath} (${(fs.statSync(outPath).size / 1024 / 1024).toFixed(2)} MB)`);
+console.log(`Generated new CSGO map JSON: ${outPath} (${(fs.statSync(outPath).size / 1024 / 1024).toFixed(2)} MB)`);
 console.log(`CT Spawns: ${ctSpawns.length}, T Spawns: ${tSpawns.length}`);
 console.log(`Meshes: ${Object.keys(textureMeshes).length}, Colliders: ${colliders.length}, WallSegments: ${wallSegments.length}, Floors: ${floorTriangles.length}`);
