@@ -68,21 +68,21 @@ export class MapManager {
         () => {
           console.warn('Dust2 skybox cube texture missing, using atmospheric fallback gradient');
           if (this.currentMapId === 'cs16') {
-            this.scene.background = new THREE.Color(0xd6be96);
+            this.scene.background = new THREE.Color(0xbdddf4);
           }
         }
       );
     } catch (e) {
-      this.scene.background = new THREE.Color(0xd6be96);
+      this.scene.background = new THREE.Color(0xbdddf4);
     }
   }
 
   initLighting() {
-    const hemiLight = new THREE.HemisphereLight(0xfff0dd, 0x555544, 0.75);
+    const hemiLight = new THREE.HemisphereLight(0xfff8ee, 0x8a7b64, 0.95);
     hemiLight.position.set(0, 50, 0);
     this.scene.add(hemiLight);
 
-    const sunLight = new THREE.DirectionalLight(0xfffaed, 1.25);
+    const sunLight = new THREE.DirectionalLight(0xfffdf7, 1.45);
     sunLight.position.set(45, 60, -35);
     sunLight.castShadow = true;
     sunLight.shadow.mapSize.width = 2048;
@@ -272,7 +272,7 @@ export class MapManager {
       if (this.skyboxTexture) {
         this.scene.background = this.skyboxTexture;
       } else {
-        this.scene.background = new THREE.Color(0xd6be96);
+        this.scene.background = new THREE.Color(0xbdddf4);
       }
       this.scene.fog = new THREE.FogExp2(0xd6be96, 0.0025);
     }

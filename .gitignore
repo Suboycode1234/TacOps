@@ -40,3 +40,7 @@ dist-ssr
 # Standalone distribution file (only published via GitHub Releases)
 *standalone*.html
 Tacops_standalone.html
+
+# Heavy 4K Remake Map (>100MB)
+public/models/Maps/Dust2/cs2_dust2_4k.glb
+

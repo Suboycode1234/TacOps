@@ -38,10 +38,11 @@ const resumeBtn = document.getElementById('resume-btn');
 const openTeamBtn = document.getElementById('open-team-btn');
 // Map Selection Elements
 const mapCardCs16 = document.getElementById('map-card-cs16');
-const mapCardCs2 = document.getElementById('map-card-cs2') || document.getElementById('map-card-csgo');
+const mapCardCsgo = document.getElementById('map-card-csgo');
+const mapCardCs2 = document.getElementById('map-card-cs2');
 const mapPill = document.getElementById('map-pill');
 const openMapBtn = document.getElementById('open-map-btn');
-let currentMap = 'cs2';
+let currentMap = 'csgo';
 
 
 // Team Select Elements
@@ -222,24 +223,14 @@ selectTBtn.addEventListener('click', () => selectFaction('T'));
 // Map Selector Logic
 function updateMapUI(mapId) {
   currentMap = mapId;
-  if (mapCardCs16) {
-    if (mapId === 'cs16') mapCardCs16.classList.add('active');
-    else mapCardCs16.classList.remove('active');
-  }
-  if (mapCardCs2) {
-    if (mapId === 'cs2' || mapId === 'csgo') mapCardCs2.classList.add('active');
-    else mapCardCs2.classList.remove('active');
-  }
+  if (mapCardCs16) mapCardCs16.classList.toggle('active', mapId === 'cs16');
+  if (mapCardCsgo) mapCardCsgo.classList.toggle('active', mapId === 'csgo');
+  if (mapCardCs2) mapCardCs2.classList.toggle('active', mapId === 'cs2');
+
   if (mapPill) {
-    mapPill.textContent = (mapId === 'cs2' || mapId === 'csgo') ? 'MAP: CS2 [F2]' : 'MAP: CS 1.6 [F2]';
-    mapPill.style.color = (mapId === 'cs2' || mapId === 'csgo') ? '#48cae4' : '#ffb703';
-    mapPill.style.borderColor = (mapId === 'cs2' || mapId === 'csgo') ? 'rgba(72, 202, 228, 0.4)' : 'rgba(255, 170, 0, 0.35)';
-    mapPill.style.background = (mapId === 'cs2' || mapId === 'csgo') ? 'rgba(0, 180, 216, 0.12)' : 'rgba(255, 170, 0, 0.12)';
-  }
-  if (openMapBtn) {
-    openMapBtn.textContent = (mapId === 'cs2' || mapId === 'csgo') ? 'SWITCH MAP: CS 1.6 (F2)' : 'SWITCH MAP: CS2 (F2)';
-    openMapBtn.style.color = (mapId === 'cs2' || mapId === 'csgo') ? '#ffb703' : '#48cae4';
-    openMapBtn.style.borderColor = (mapId === 'cs2' || mapId === 'csgo') ? 'rgba(255, 183, 3, 0.5)' : 'rgba(72, 202, 228, 0.5)';
+    if (mapId === 'cs16') mapPill.textContent = 'MAP: CS 1.6 CLASSIC [F1]';
+    else if (mapId === 'csgo') mapPill.textContent = 'MAP: CS:GO EDITION [F2]';
+    else if (mapId === 'cs2') mapPill.textContent = 'MAP: CS2 4K REMAKE [F3]';
   }
 }
 
@@ -251,12 +242,25 @@ async function selectMap(mapId) {
 }
 
 if (mapCardCs16) mapCardCs16.addEventListener('click', () => selectMap('cs16'));
+if (mapCardCsgo) mapCardCsgo.addEventListener('click', () => selectMap('csgo'));
 if (mapCardCs2) mapCardCs2.addEventListener('click', () => selectMap('cs2'));
-if (mapPill) mapPill.addEventListener('click', () => selectMap(currentMap === 'cs16' ? 'cs2' : 'cs16'));
-if (openMapBtn) openMapBtn.addEventListener('click', () => selectMap(currentMap === 'cs16' ? 'cs2' : 'cs16'));
+
+if (mapPill) {
+  mapPill.addEventListener('click', () => {
+    const cycle = currentMap === 'cs16' ? 'csgo' : (currentMap === 'csgo' ? 'cs2' : 'cs16');
+    selectMap(cycle);
+  });
+}
+if (openMapBtn) {
+  openMapBtn.addEventListener('click', () => {
+    const cycle = currentMap === 'cs16' ? 'csgo' : (currentMap === 'csgo' ? 'cs2' : 'cs16');
+    selectMap(cycle);
+  });
+}
 
 game.onMapChanged = (mapId) => updateMapUI(mapId);
 updateMapUI(currentMap);
+selectMap(currentMap);
 
 
 openTeamBtn.addEventListener('click', () => {

@@ -112,8 +112,13 @@ for (const file of assetFiles) {
   const rel = '/' + path.relative(distPath, file).replace(/\\/g, '/');
   const mime = getMimeType(file);
   const buf = fs.readFileSync(file);
-  const b64 = buf.toString('base64');
-  writeStream.write('<script type="text/plain" data-asset="' + rel + '" data-mime="' + mime + '">' + b64 + '</script>\n');
+  writeStream.write('<script type="text/plain" data-asset="' + rel + '" data-mime="' + mime + '">');
+  const chunkSize = 1024 * 1024 * 48; // 48MB chunks (multiple of 3 to avoid padding)
+  for (let offset = 0; offset < buf.length; offset += chunkSize) {
+    const end = Math.min(offset + chunkSize, buf.length);
+    writeStream.write(buf.subarray(offset, end).toString('base64'));
+  }
+  writeStream.write('</script>\n');
   count++;
   if (count % 25 === 0 || count === assetFiles.length) {
     console.log('   Inlined ' + count + '/' + assetFiles.length + ' assets...');
@@ -129,16 +134,16 @@ const bootloader = `
     window.__ASSET_BLOB_URLS__ = {};
 
     function base64ToBlob(base64, mime) {
-      const sliceSize = 1024 * 512;
-      const byteCharacters = atob(base64);
+      const chunkSize = 1024 * 768; // multiple of 4
       const byteArrays = [];
-      for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
-        const slice = byteCharacters.slice(offset, offset + sliceSize);
-        const byteNumbers = new Uint8Array(slice.length);
-        for (let i = 0; i < slice.length; i++) {
-          byteNumbers[i] = slice.charCodeAt(i);
+      for (let offset = 0; offset < base64.length; offset += chunkSize) {
+        const chunk = base64.slice(offset, offset + chunkSize);
+        const binStr = atob(chunk);
+        const bytes = new Uint8Array(binStr.length);
+        for (let i = 0; i < binStr.length; i++) {
+          bytes[i] = binStr.charCodeAt(i);
         }
-        byteArrays.push(byteNumbers);
+        byteArrays.push(bytes);
       }
       return new Blob(byteArrays, { type: mime });
     }

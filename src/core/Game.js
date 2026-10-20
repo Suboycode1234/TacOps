@@ -42,7 +42,7 @@ export class Game {
     // Match / Round State
     this.roundTime = 115;
     this.currentTimer = this.roundTime;
-    this.currentMapId = 'cs16';
+    this.currentMapId = 'csgo';
     this.currentRound = 1;
     this.ctScore = 0;
     this.tScore = 0;

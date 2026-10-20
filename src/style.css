@@ -1164,8 +1164,8 @@ body, html {
 
 .map-cards-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
 }
 
 .map-card {
@@ -1214,11 +1214,16 @@ body, html {
   border: 1px solid rgba(224, 169, 109, 0.4);
 }
 
-.map-badge.cs2,
 .map-badge.csgo {
   background: rgba(0, 180, 216, 0.2);
   color: #48cae4;
   border: 1px solid rgba(0, 180, 216, 0.4);
+}
+
+.map-badge.cs2 {
+  background: rgba(255, 183, 3, 0.2);
+  color: #ffb703;
+  border: 1px solid rgba(255, 183, 3, 0.4);
 }
 
 .map-selected-tag {
