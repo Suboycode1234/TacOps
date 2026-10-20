@@ -166,11 +166,19 @@ export class MapManager {
         this.mapBounds = { minX: -23.5, maxX: 47.5, minZ: -80.0, maxZ: 26.5, voidY: -4.5 };
       }
 
-      if (mapId === 'csgo') {
-        this.buyZoneCT = { minX: 0, maxX: 16, minZ: -65, maxZ: -50 };
-        this.buyZoneT = { minX: -28, maxX: -6, minZ: 14, maxZ: 28 };
+      if (data.buyZoneCT) {
+        this.buyZoneCT = data.buyZoneCT;
+      } else if (mapId === 'csgo') {
+        this.buyZoneCT = { minX: 1, maxX: 7.5, minZ: -10, maxZ: -1 };
       } else {
         this.buyZoneCT = { minX: 4, maxX: 16, minZ: -56, maxZ: -36 };
+      }
+
+      if (data.buyZoneT) {
+        this.buyZoneT = data.buyZoneT;
+      } else if (mapId === 'csgo') {
+        this.buyZoneT = { minX: -7.5, maxX: -1, minZ: 1, maxZ: 10 };
+      } else {
         this.buyZoneT = { minX: -26, maxX: 8, minZ: 14, maxZ: 28 };
       }
 
@@ -271,11 +279,17 @@ export class MapManager {
   }
 
   createShootingTargets() {
-    const targetPositions = [
-      new THREE.Vector3(14, 0.5, -24), // Pit
-      new THREE.Vector3(10, 2.5, -34), // A ramp
-      new THREE.Vector3(6, 2.2, -6),   // Long corner
-    ];
+    const targetPositions = this.currentMapId === 'csgo'
+      ? [
+          new THREE.Vector3(0, 0.45, 0),
+          new THREE.Vector3(3.5, 0.45, 4.0),
+          new THREE.Vector3(-3.5, 0.45, -4.0),
+        ]
+      : [
+          new THREE.Vector3(14, 0.5, -24), // Pit
+          new THREE.Vector3(10, 2.5, -34), // A ramp
+          new THREE.Vector3(6, 2.2, -6),   // Long corner
+        ];
 
     const targetMat = this.createBullseyeMaterial();
 
@@ -352,12 +366,13 @@ export class MapManager {
       depthWrite: false,
       blending: THREE.AdditiveBlending,
     });
+    const isCSGO = this.currentMapId === 'csgo';
     const ctMesh = new THREE.Mesh(ctGeo, ctMat);
     ctMesh.rotation.x = -Math.PI / 2;
-    ctMesh.position.set(10, 2.46, -44);
+    ctMesh.position.set(isCSGO ? 4.5 : 10, isCSGO ? 0.46 : 2.46, isCSGO ? -4.5 : -44);
     this.propsGroup.add(ctMesh);
 
-    const tGeo = new THREE.RingGeometry(3.5, 3.8, 32);
+    const tGeo = new THREE.RingGeometry(isCSGO ? 2.5 : 3.5, isCSGO ? 2.8 : 3.8, 32);
     const tMat = new THREE.MeshBasicMaterial({
       color: 0xe63946,
       transparent: true,
@@ -368,7 +383,7 @@ export class MapManager {
     });
     const tMesh = new THREE.Mesh(tGeo, tMat);
     tMesh.rotation.x = -Math.PI / 2;
-    tMesh.position.set(-18, 3.27, 21);
+    tMesh.position.set(isCSGO ? -4.5 : -18, isCSGO ? 0.46 : 3.27, isCSGO ? 4.5 : 21);
     this.propsGroup.add(tMesh);
   }
 

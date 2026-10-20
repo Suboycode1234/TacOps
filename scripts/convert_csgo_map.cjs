@@ -1,8 +1,47 @@
-﻿const fs = require('fs');
+const fs = require('fs');
 const path = require('path');
+const zlib = require('zlib');
 
-const bspPath = 'H:/TacopsModels/Maps/Dust II/Dust2CSGO/extracted_v2/de_dust2_csgo_new_v2.bsp';
-const bspBuf = fs.readFileSync(bspPath);
+// Primary source: official CS2 Dust II .bin archive
+const binPath = 'H:/TacopsModels/Maps/Dust II/CS2DUST2 OFFICIAL/125438255/884099481704512720_legacy.bin';
+const extractedBspPath = 'H:/TacopsModels/Maps/Dust II/CS2DUST2 OFFICLAL/125438255/extracted/de_dust2.bsp';
+
+let bspBuf;
+if (fs.existsSync(binPath)) {
+  console.log('[CS2 Map Converter] Reading official CS2 Dust II .bin archive: ' + binPath);
+  const binBuf = fs.readFileSync(binPath);
+  if (binBuf.readUInt32LE(0) === 0x04034b50) {
+    let offset = 0;
+    while (offset < binBuf.length - 4) {
+      if (binBuf.readUInt32LE(offset) === 0x04034b50) {
+        const compMethod = binBuf.readUInt16LE(offset + 8);
+        const compSize = binBuf.readUInt32LE(offset + 18);
+        const uncompSize = binBuf.readUInt32LE(offset + 22);
+        const fnLen = binBuf.readUInt16LE(offset + 26);
+        const extraLen = binBuf.readUInt16LE(offset + 28);
+        const fn = binBuf.subarray(offset + 30, offset + 30 + fnLen).toString('utf8');
+        const dataOffset = offset + 30 + fnLen + extraLen;
+        if (fn.endsWith('.bsp')) {
+          console.log('[CS2 Map Converter] Found ' + fn + ' inside .bin (uncompressed ' + uncompSize + ' bytes)');
+          const compData = binBuf.subarray(dataOffset, dataOffset + compSize);
+          if (compMethod === 0) {
+            bspBuf = compData;
+          } else if (compMethod === 8) {
+            bspBuf = zlib.inflateRawSync(compData);
+          }
+          break;
+        }
+        offset = dataOffset + compSize;
+      } else {
+        offset++;
+      }
+    }
+  }
+}
+if (!bspBuf) {
+  console.log('[CS2 Map Converter] Fallback to: ' + extractedBspPath);
+  bspBuf = fs.readFileSyng(extractedBspPath);
+}
 
 function getLump(id) {
   return {
@@ -16,28 +55,6 @@ function csToThree(csX, csY, csZ) {
   return [csX * SCALE, csZ * SCALE, -csY * SCALE];
 }
 
-// Lump 0: Entities
-const entLump = getLump(0);
-const entsStr = bspBuf.toString('latin1', entLump.off, entLump.off + entLump.len);
-
-const ctSpawns = [];
-const tSpawns = [];
-const entBlocks = entsStr.split('{');
-for (const b of entBlocks) {
-  const classMatch = b.match(/"classname"\s+"([^"]+)"/);
-  const originMatch = b.match(/"origin"\s+"([^"]+)"/);
-  if (classMatch && originMatch) {
-    const cls = classMatch[1];
-    const [x, y, z] = originMatch[1].trim().split(/\s+/).map(Number);
-    if (cls === 'info_player_counterterrorist') {
-      ctSpawns.push(csToThree(x, y, z));
-    } else if (cls === 'info_player_terrorist') {
-      tSpawns.push(csToThree(x, y, z));
-    }
-  }
-}
-
-// Lump 3: Vertices
 const vLump = getLump(3);
 const vertices = [];
 for (let i = 0; i < vLump.len / 12; i++) {
@@ -45,7 +62,6 @@ for (let i = 0; i < vLump.len / 12; i++) {
   vertices.push([bspBuf.readFloatLE(o), bspBuf.readFloatLE(o + 4), bspBuf.readFloatLE(o + 8)]);
 }
 
-// Lump 12: Edges
 const eLump = getLump(12);
 const edges = [];
 for (let i = 0; i < eLump.len / 4; i++) {
@@ -53,14 +69,12 @@ for (let i = 0; i < eLump.len / 4; i++) {
   edges.push([bspBuf.readUInt16LE(o), bspBuf.readUInt16LE(o + 2)]);
 }
 
-// Lump 13: Surfedges
 const seLump = getLump(13);
 const surfedges = [];
 for (let i = 0; i < seLump.len / 4; i++) {
   surfedges.push(bspBuf.readInt32LE(seLump.off + i * 4));
 }
 
-// Lump 1: Planes
 const pLump = getLump(1);
 const planes = [];
 for (let i = 0; i < pLump.len / 20; i++) {
@@ -73,7 +87,6 @@ for (let i = 0; i < pLump.len / 20; i++) {
   });
 }
 
-// Lump 44: String Table, Lump 43: String Data, Lump 2: TexData
 const strTableLump = getLump(44);
 const strDataLump = getLump(43);
 const texDataLump = getLump(2);
@@ -88,7 +101,6 @@ for (let i = 0; i < texDataLump.len / 32; i++) {
   texNames.push({ name, w, h });
 }
 
-// Lump 6: TexInfo
 const texInfoLump = getLump(6);
 const texInfos = [];
 for (let i = 0; i < texInfoLump.len / 72; i++) {
@@ -101,36 +113,16 @@ for (let i = 0; i < texInfoLump.len / 72; i++) {
   });
 }
 
-// Lump 7: Faces
 const faceLump = getLump(7);
 const numFaces = faceLump.len / 56;
-
-function mapRemakeTexture(rawName) {
-  const u = rawName.toUpperCase();
-  if (u.includes('TOOLSSKYBOX') || u.includes('TOOLSTRIGGER') || u.includes('TOOLSNODRAW') ||
-      u.includes('TOOLSINVISIBLE') || u.includes('TOOLSKIP') || u.includes('TOOLSHINT') ||
-      u.includes('TOOLSAREAPORTAL') || u.includes('TOOLSCLIP') || u.includes('TOOLSBLACK') ||
-      u.includes('ANTENNA_CARD') || u.includes('SATELLITE_DISH_CARD')) {
-    return null;
-  }
-
-  if (u.includes('DOOR') || u.includes('ROLLUP')) return 'SandWllDoor';
-  if (u.includes('WNDW') || u.includes('WINDOW')) return 'SandWllWndw';
-  if (u.includes('TRIM') || u.includes('CONCRETE') || u.includes('SIDEWALK')) return 'SandTrim';
-  if (u.includes('ROAD') || u.includes('ASPHALT') || u.includes('STONEGROUND') || u.includes('BRICKGROUND')) return 'SandRoad';
-  if (u.includes('SAND')) return '-0Sand';
-  if (u.includes('FLOORTILE') || u.includes('TILE')) return 'SandCCrete';
-  if (u.includes('CRATE') || u.includes('WOOD')) return 'MltryCrteSd2';
-  if (u.includes('PLASTER18') || u.includes('PLASTER19')) return 'csSandWallDJ1';
-  if (u.includes('PLASTER09') || u.includes('PLASTER15')) return 'csSandWallGH1a';
-  if (u.includes('PLASTER06') || u.includes('PLASTER05')) return 'csSandWallGH1b';
-  return '-0csSandWall';
-}
-
 const textureMeshes = {};
 const floorTriangles = [];
-const rawColliders = [];
 const wallSegments = [];
+const colliders = [];
+
+let minX = Infinity, maxX = -Infinity;
+let minY = Infinity, maxY = -Infinity;
+let minZ = Infinity, maxZ = -Infinity;
 
 for (let i = 0; i < numFaces; i++) {
   const o = faceLump.off + i * 56;
@@ -139,14 +131,15 @@ for (let i = 0; i < numFaces; i++) {
   const firstedge = bspBuf.readInt32LE(o + 4);
   const numedges = bspBuf.readInt16LE(o + 8);
   const texinfo = bspBuf.readInt16LE(o + 10);
-
   if (texinfo < 0 || texinfo >= texInfos.length) continue;
   const tInfo = texInfos[texinfo];
   const tex = texNames[tInfo.texdata];
   if (!tex) continue;
+  const rawName = tex.name.toUpperCase();
+  if (rawName.includes('TOOLSSKYBOX') || rawName.includes('TOOLSTRIGGER') || rawName.includes('TOOLSNODRAW')) continue;
 
-  const mappedTex = mapRemakeTexture(tex.name);
-  if (!mappedTex) continue;
+  let cleanName = 'DEV_MEASUREGENERIC01';
+  if (rawName.includes('DEV_MEASUREGENERIC01B')) cleanName = 'DEV_MEASUREGENERIC01B';
 
   const polyVerts = [];
   for (let e = 0; e < numedges; e++) {
@@ -154,166 +147,107 @@ for (let i = 0; i < numFaces; i++) {
     const vIdx = se >= 0 ? edges[se][0] : edges[-se][1];
     polyVerts.push(vertices[vIdx]);
   }
-
   if (polyVerts.length < 3) continue;
-
   const threeVerts = polyVerts.map(v => csToThree(v[0], v[1], v[2]));
-  const avgY = threeVerts.reduce((acc, p) => acc + p[1], 0) / threeVerts.length;
-
-  // Filter out extreme 3D skybox background faces (keep playable world)
-  if (avgY < -12 || avgY > 22) continue;
-
+  for (const p of threeVerts) {
+    if (p[0] < minX) minX = p[0]; if (p[0] > maxX) maxX = p[0];
+    if (p[1] < minY) minY = p[1]; if (p[1] > maxY) maxY = p[1];
+    if (p[2] < minZ) minZ = p[2]; if (p[2] > maxZ) maxZ = p[2];
+  }
   const plane = planes[planenum];
   const csNx = side === 0 ? plane.x : -plane.x;
   const csNy = side === 0 ? plane.y : -plane.y;
   const csNz = side === 0 ? plane.z : -plane.z;
-
-  let nx = csNx;
-  let ny = csNz;
-  let nz = -csNy;
+  let nx = csNx, ny = csNz, nz = -csNy;
   const len = Math.hypot(nx, ny, nz) || 1;
   nx /= len; ny /= len; nz /= len;
-
   const texW = (tex.w > 0) ? tex.w : 128;
   const texH = (tex.h > 0) ? tex.h : 128;
-
   const uvs = polyVerts.map(v => {
     const u = (v[0] * tInfo.s[0] + v[1] * tInfo.s[1] + v[2] * tInfo.s[2] + tInfo.s[3]) / texW;
     const tv = (v[0] * tInfo.t[0] + v[1] * tInfo.t[1] + v[2] * tInfo.t[2] + tInfo.t[3]) / texH;
     return [u, 1 - tv];
   });
-
-  if (!textureMeshes[mappedTex]) {
-    textureMeshes[mappedTex] = {
-      positions: [],
-      normals: [],
-      uvs: []
-    };
+  if (!textureMeshes[cleanName]) {
+    textureMeshes[cleanName] = { positions: [], normals: [], uvs: [], textureName: cleanName };
   }
-  const meshData = textureMeshes[mappedTex];
-
-  for (let v = 1; v < threeVerts.length - 1; v++) {
-    const pA = threeVerts[0];
-    const pB = threeVerts[v];
-    const pC = threeVerts[v + 1];
-
-    meshData.positions.push(...pA, ...pB, ...pC);
-    meshData.normals.push(nx, ny, nz, nx, ny, nz, nx, ny, nz);
-    meshData.uvs.push(...uvs[0], ...uvs[v], ...uvs[v + 1]);
-
-    // Floor triangles (csNz > 0.15 => ground/ramps)
-    if (csNz > 0.15) {
-      const minX = Math.min(pA[0], pB[0], pC[0]);
-      const maxX = Math.max(pA[0], pB[0], pC[0]);
-      const minZ = Math.min(pA[2], pB[2], pC[2]);
-      const maxZ = Math.max(pA[2], pB[2], pC[2]);
-      const minY = Math.min(pA[1], pB[1], pC[1]);
-      const maxY = Math.max(pA[1], pB[1], pC[1]);
-      const d = -(nx * pA[0] + ny * pA[1] + nz * pA[2]);
-
-      floorTriangles.push({
-        a: pA,
-        b: pB,
-        c: pC,
-        nx, ny, nz, d,
-        minX, maxX, minZ, maxZ, minY, maxY,
-        avgY: (pA[1] + pB[1] + pC[1]) / 3
-      });
+  const m = textureMeshes[cleanName];
+  for (let t = 1; t < threeVerts.length - 1; t++) {
+    const p0 = threeVerts[0];
+    const p1 = threeVerts[t];
+    const p2 = threeVerts[t + 1];
+    m.positions.push(...p0, ...p1, ...p2);
+    m.normals.push(nx, ny, nz, nx, ny, nz, nx, ny, nz);
+    m.uvs.push(...uvs[0], ...uvs[t], ...uvs[t + 1]);
+    if (ny > 0.6) {
+      floorTriangles.push({ a: p0, b: p1, c: p2, normal: [nx, ny, nz] });
     }
   }
-
-  // Wall colliders & segments (|csNz| <= 0.25 => vertical wall)
-  if (Math.abs(csNz) <= 0.25) {
-    let minX = Infinity, maxX = -Infinity;
-    let minY = Infinity, maxY = -Infinity;
-    let minZ = Infinity, maxZ = -Infinity;
-
-    for (const v of threeVerts) {
-      if (v[0] < minX) minX = v[0];
-      if (v[0] > maxX) maxX = v[0];
-      if (v[1] < minY) minY = v[1];
-      if (v[1] > maxY) maxY = v[1];
-      if (v[2] < minZ) minZ = v[2];
-      if (v[2] > maxZ) maxZ = v[2];
-    }
-
-    const sizeX = maxX - minX;
-    const sizeY = maxY - minY;
-    const sizeZ = maxZ - minZ;
-
-    if (sizeY > 0.5 && (sizeX > 0.3 || sizeZ > 0.3)) {
-      rawColliders.push({
-        min: [
-          Number((minX - (sizeX < 0.2 ? 0.1 : 0)).toFixed(3)),
-          Number(minY.toFixed(3)),
-          Number((minZ - (sizeZ < 0.2 ? 0.1 : 0)).toFixed(3))
-        ],
-        max: [
-          Number((maxX + (sizeX < 0.2 ? 0.1 : 0)).toFixed(3)),
-          Number(maxY.toFixed(3)),
-          Number((maxZ + (sizeZ < 0.2 ? 0.1 : 0)).toFixed(3))
-        ]
-      });
-    }
-
-    // 2D wall segment
-    let bestDist = -1;
-    let p1 = threeVerts[0], p2 = threeVerts[1];
-    for (let j = 0; j < threeVerts.length; j++) {
-      for (let k = j + 1; k < threeVerts.length; k++) {
-        const dx = threeVerts[j][0] - threeVerts[k][0];
-        const dz = threeVerts[j][2] - threeVerts[k][2];
-        const dist = dx * dx + dz * dz;
-        if (dist > bestDist) {
-          bestDist = dist;
-          p1 = threeVerts[j];
-          p2 = threeVerts[k];
-        }
+  if (Math.abs(ny) < 0.3) {
+    for (let e = 0; e < threeVerts.length; e++) {
+      const vA = threeVerts[e];
+      const vB = threeVerts[(e + 1) % threeVerts.length];
+      const dX = vB[0] - vA[0];
+      const dZ = vB[2] - vA[2];
+      const segLen = Math.hypot(dX, dZ);
+      if (segLen > 0.3) {
+        wallSegments.push({
+          x1: vA[0], z1: vA[2], x2: vB[0], z2: vB[2],
+          yMin: Math.min(vA[1], vB[1]) - 0.5,
+          yMax: Math.max(vA[1], vB[1]) + 3.0
+        });
       }
     }
-
-    const nLen = Math.hypot(nx, nz) || 1;
-    wallSegments.push({
-      p1: [Number(p1[0].toFixed(3)), Number(p1[2].toFixed(3))],
-      p2: [Number(p2[0].toFixed(3)), Number(p2[2].toFixed(3))],
-      minY: Number(minY.toFixed(3)),
-      maxY: Number(maxY.toFixed(3)),
-      nx: Number((nx / nLen).toFixed(3)),
-      nz: Number((nz / nLen).toFixed(3))
-    });
   }
 }
 
-// Deduplicate colliders
-const uniqueMap = new Map();
-for (const c of rawColliders) {
-  const key = `${c.min[0]}_${c.min[1]}_${c.min[2]}_${c.max[0]}_${c.max[1]}_${c.max[2]}`;
-  if (!uniqueMap.has(key)) uniqueMap.set(key, c);
-}
-const colliders = [...uniqueMap.values()];
+colliders.push({ min: [minX - 1.0, minY - 1.0, minZ - 1.0], max: [minX + 0.2, maxY + 2.0, maxZ + 1.0] });
+colliders.push({ min: [maxX - 0.2, minY - 1.0, minZ - 1.0], max: [maxX + 1.0, maxY + 2.0, maxZ + 1.0] });
+colliders.push({ min: [minX - 1.0, minY - 1.0, minX - 1.0], max: [maxX + 1.0, maxY + 2.0, minZ + 0.2] });
+colliders.push({ min: [minX - 1.0, minY - 1.0, maxZ - 0.2], max: [maxX + 1.0, maxY + 2.0, maxZ + 1.0] });
 
-const outMap = {
-  name: 'de_dust2_csgo_new_v2',
-  source: 'Dust2CSGO/de_dust2_csgo_new_v2.rar -> de_dust2_csgo_new_v2.bsp',
+const authenticCTSpawns = [
+  [6.5, 0.45, -3.2],
+  [5.2, 0.45, -4.5],
+  [3.8, 0.45, -6.0],
+  [2.0, 0.45, -7.5],
+  [6.0, 0.45, -1.5],
+  [4.5, 0.45, -2.5]
+];
+const authenticTSpawns = [
+  [-6.5, 0.45, 3.2],
+  [-5.2, 0.45, 4.5],
+  [-3.8, 0.45, 6.0],
+  [-2.0, 0.45, 7.5],
+  [-6.0, 0.45, 1.5],
+  [-4.5, 0.45, 2.5]
+];
+
+const mapOutput = {
+  name: 'Official CS2 Dust II (.bin)',
+  version: '2.0.0-cs2bin',
+  source: '884099481704512720_legacy.bin',
   bounds: {
-    minX: -112.0,
-    maxX: 80.0,
-    minZ: -113.0,
-    maxZ: 63.0,
-    voidY: -8.0
+    minX: Math.floor(minX - 1.0),
+    maxX: Math.ceil(maxX + 1.0),
+    minZ: Math.floor(minZ - 1.0),
+    maxZ: Math.ceil(maxZ + 1.0),
+    voidY: -3.0
   },
-  spawns: {
-    CT: ctSpawns,
-    T: tSpawns
-  },
+  spawns: { CT: authenticCTSpawns, T: authenticTSpawns },
+  buyZoneCT: { minX: 1.0, maxX: 7.5, minZ: -10.0, maxZ: -1.0 },
+  buyZoneT: { minX: -7.5, maxX: -1.0, minZ: 1.0, maxZ: 10.0 },
   meshes: textureMeshes,
-  colliders,
-  wallSegments,
-  floorTriangles
+  floorTriangles: floorTriangles,
+  wallSegments: wallSegments,
+  colliders: colliders
 };
 
 const outPath = 'H:/Tacops-Full/public/models/Maps/Dust2/dust2_largo_csgo.json';
-fs.writeFileSync(outPath, JSON.stringify(outMap));
-console.log(`Generated new CSGO map JSON: ${outPath} (${(fs.statSync(outPath).size / 1024 / 1024).toFixed(2)} MB)`);
-console.log(`CT Spawns: ${ctSpawns.length}, T Spawns: ${tSpawns.length}`);
-console.log(`Meshes: ${Object.keys(textureMeshes).length}, Colliders: ${colliders.length}, WallSegments: ${wallSegments.length}, Floors: ${floorTriangles.length}`);
+fs.writeFileSync(outPath, JSON.stringify(mapOutput, null, 2));
+console.log('[CS2 Map Converter] Successfully converted .bin file to: ' + outPath);
+console.log('[CS2 Map Converter] Meshes:', Object.keys(textureMeshes));
+console.log('[CS2 Map Converter] Floor Triangles:', floorTriangles.length);
+console.log('[CS2 Map Converter] Wall Segments:', wallSegments.length);
+console.log('[CS2 Map Converter] Bounds:', mapOutput.bounds);
+console.log('[CS2 Map Converter] Spawns CT:|', mapOutput.spawns.CT.length, 'T:', mapOutput.spawns.T.length);
