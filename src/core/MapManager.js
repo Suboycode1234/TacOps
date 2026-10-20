@@ -113,6 +113,7 @@ export class MapManager {
       (loaded) => {
         loaded.wrapS = THREE.RepeatWrapping;
         loaded.wrapT = THREE.RepeatWrapping;
+        loaded.colorSpace = THREE.SRGBColorSpace;
         loaded.needsUpdate = true;
       },
       undefined,
@@ -123,6 +124,7 @@ export class MapManager {
 
     tex.wrapS = THREE.RepeatWrapping;
     tex.wrapT = THREE.RepeatWrapping;
+    tex.colorSpace = THREE.SRGBColorSpace;
     this.textureCache.set(textureName, tex);
     return tex;
   }
@@ -139,6 +141,7 @@ export class MapManager {
       (loaded) => {
         loaded.wrapS = THREE.RepeatWrapping;
         loaded.wrapT = THREE.RepeatWrapping;
+        loaded.colorSpace = THREE.SRGBColorSpace;
         loaded.needsUpdate = true;
       },
       undefined,
@@ -148,6 +151,7 @@ export class MapManager {
     );
     tex.wrapS = THREE.RepeatWrapping;
     tex.wrapT = THREE.RepeatWrapping;
+    tex.colorSpace = THREE.SRGBColorSpace;
     this.cs2TextureCache.set(texFileName, tex);
     return tex;
   }
@@ -227,11 +231,7 @@ export class MapManager {
     return res.length > 0 ? res : this.wallSegments;
   }
 
-  async loadMap(mapId = 'cs16') {
-    this.currentMapId = mapId;
-    this.mapLoaded = false;
-
-    // 1. Dispose old terrain geometry and meshes recursively
+  clearMap() {
     while (this.mapGroup.children.length > 0) {
       const child = this.mapGroup.children[0];
       this.mapGroup.remove(child);
@@ -244,7 +244,6 @@ export class MapManager {
       });
     }
 
-    // 2. Dispose old props and targets
     while (this.propsGroup.children.length > 0) {
       const child = this.propsGroup.children[0];
       this.propsGroup.remove(child);
@@ -262,6 +261,20 @@ export class MapManager {
     this.wallSegments = [];
     this.floorTriangles = [];
     this.floorGrid = null;
+    this.wallGrid = null;
+  }
+
+  async loadMap(mapId = 'cs16') {
+    this._loadSessionId = (this._loadSessionId || 0) + 1;
+    const session = this._loadSessionId;
+    this.isLoading = true;
+    this.mapLoaded = false;
+    this.currentMapId = mapId;
+
+    const isCS2 = mapId === 'cs2' || mapId === 'csgo';
+
+    // Immediate cleanup of old scene geometry
+    this.clearMap();
 
     // Atmosphere & Skybox switching
     let mapJsonUrl;
@@ -288,6 +301,12 @@ export class MapManager {
       const res = await fetch(mapJsonUrl);
       if (!res.ok) throw new Error('HTTP error ' + res.status);
       const data = await res.json();
+
+      // Check if another map load was triggered while fetching JSON
+      if (this._loadSessionId !== session) {
+        console.log(`[MapManager] Discarding outdated map load for ${mapId} (session ${session})`);
+        return;
+      }
 
       // Set Map Bounds & Buy Zones
       if (data.bounds) {
@@ -363,6 +382,25 @@ export class MapManager {
           gltfLoader.load(data.glbUrl, resolve, undefined, reject);
         });
 
+        // Double check session after GLB download completes
+        if (this._loadSessionId !== session) {
+          console.log(`[MapManager] Discarding outdated GLB load for ${mapId} (session ${session})`);
+          return;
+        }
+
+        // Final guarantee: clear mapGroup before adding new scene
+        this.clearMap();
+
+        // Re-assign collision data because clearMap wiped it
+        if (data.floorTriangles) {
+          this.floorTriangles = data.floorTriangles;
+          this.buildFloorGrid();
+        }
+        if (data.wallSegments) {
+          this.wallSegments = data.wallSegments;
+          this.buildWallGrid();
+        }
+
         const textureMap = data.textureMap || {};
 
         gltf.scene.traverse((c) => {
@@ -372,15 +410,18 @@ export class MapManager {
 
             const name = (c.name || '').toLowerCase();
 
-            // Filter out blocklight, shadow dummy meshes, overlay, and black occlusion volumes
-            if (
+            // Occlusion filter: NEVER filter out blacktop / roads / floors!
+            const isOccluder = (
               name.includes('blocklight') ||
               name.includes('shadow') ||
-              name.includes('overlay') ||
-              name.includes('_black') ||
+              name.includes('mesh_overlay') ||
               name.includes('toolsblack') ||
-              name.includes('nodraw')
-            ) {
+              name.includes('nodraw') ||
+              name.includes('agg10_8_black') ||
+              name.includes('mat0_black')
+            ) && !name.includes('blacktop');
+
+            if (isOccluder) {
               c.visible = false;
               return;
             }
@@ -398,11 +439,13 @@ export class MapManager {
             let roughness = 0.85;
             let metalness = 0.05;
             let fallbackColor = 0xd8c29d; // Sandstone plaster
+            let side = THREE.FrontSide;
 
             if (/metal|iron|steel|corrugated|grate|vent|pipe|scaffold|can|barrel/.test(tag)) {
               roughness = 0.4;
               metalness = 0.75;
               fallbackColor = 0x6e767d;
+              if (/grate|fence|rail/.test(tag)) side = THREE.DoubleSide;
             } else if (/car|vehicle|truck|van|trike|vespa/.test(tag)) {
               roughness = 0.3;
               metalness = 0.6;
@@ -419,10 +462,12 @@ export class MapManager {
               roughness = 0.6;
               metalness = 0.0;
               fallbackColor = 0x4f6e3c;
+              side = THREE.DoubleSide;
             } else if (/awning|cloth|tarp|fabric/.test(tag)) {
               roughness = 0.7;
               metalness = 0.0;
               fallbackColor = 0xa8483b;
+              side = THREE.DoubleSide;
             } else if (/concrete/.test(tag)) {
               roughness = 0.85;
               metalness = 0.05;
@@ -439,14 +484,14 @@ export class MapManager {
                 map: tex,
                 roughness: roughness,
                 metalness: metalness,
-                side: THREE.DoubleSide,
+                side: side,
               });
             } else {
               c.material = new THREE.MeshStandardMaterial({
                 color: fallbackColor,
                 roughness: roughness,
                 metalness: metalness,
-                side: THREE.DoubleSide,
+                side: side,
               });
             }
           }
@@ -455,6 +500,16 @@ export class MapManager {
         this.mapGroup.add(gltf.scene);
       } else {
         // Construct from meshesData (CS 1.6 Classic)
+        this.clearMap();
+        if (data.floorTriangles) {
+          this.floorTriangles = data.floorTriangles;
+          this.buildFloorGrid();
+        }
+        if (data.wallSegments) {
+          this.wallSegments = data.wallSegments;
+          this.buildWallGrid();
+        }
+
         const meshesData = data.meshes || {};
         for (const [texKey, mData] of Object.entries(meshesData)) {
           if (!mData.positions || mData.positions.length === 0) continue;
@@ -499,12 +554,14 @@ export class MapManager {
       this.createBuyZoneDecals();
 
       this.mapLoaded = true;
-      console.log('[MapManager] ' + (isCS2 ? 'Counter-Strike 2 Official Map' : 'CS 1.6 Classic') + ' loaded: ' + this.floorTriangles.length + ' floors, ' + this.wallSegments.length + ' wall segments.');
+      this.isLoading = false;
+      console.log('[MapManager] ' + (isCS2 ? (mapId === 'cs2' ? 'CS2 4K Remake' : 'CS:GO Edition') : 'CS 1.6 Classic') + ' loaded: ' + this.floorTriangles.length + ' floors, ' + this.wallSegments.length + ' wall segments.');
 
       if (this.onMapLoaded) {
         this.onMapLoaded(mapId);
       }
     } catch (e) {
+      this.isLoading = false;
       console.error('Failed to load map ' + mapId + ', falling back to procedural ground:', e);
       this.createFallbackGround();
     }
