@@ -8,7 +8,10 @@ export class MapManager {
     this.wallSegments = [];
     this.floorTriangles = [];
     this.floorGrid = null;
+    this.wallGrid = null;
     this.gridCellSize = 4.0;
+    this.wallGrid = null;
+    this.wallCellSize = 6.0;
     this.targets = [];
     this.textureCache = new Map();
     this.cs2TextureCache = new Map();
@@ -173,6 +176,57 @@ export class MapManager {
     }
   }
 
+  buildWallGrid() {
+    this.wallGrid = new Map();
+    this.wallCellSize = 6.0;
+    if (!this.wallSegments || this.wallSegments.length === 0) return;
+    for (let i = 0; i < this.wallSegments.length; i++) {
+      const w = this.wallSegments[i];
+      const x1 = w.p1 ? w.p1[0] : (w.x1 || 0);
+      const z1 = w.p1 ? w.p1[1] : (w.z1 || 0);
+      const x2 = w.p2 ? w.p2[0] : (w.x2 || 0);
+      const z2 = w.p2 ? w.p2[1] : (w.z2 || 0);
+      const minCX = Math.floor(Math.min(x1, x2) / this.wallCellSize);
+      const maxCX = Math.floor(Math.max(x1, x2) / this.wallCellSize);
+      const minCZ = Math.floor(Math.min(z1, z2) / this.wallCellSize);
+      const maxCZ = Math.floor(Math.max(z1, z2) / this.wallCellSize);
+      for (let cx = minCX; cx <= maxCX; cx++) {
+        for (let cz = minCZ; cz <= maxCZ; cz++) {
+          const key = cx + ',' + cz;
+          let list = this.wallGrid.get(key);
+          if (!list) {
+            list = [];
+            this.wallGrid.set(key, list);
+          }
+          list.push(w);
+        }
+      }
+    }
+  }
+
+  getWallSegmentsNear(x, z) {
+    if (!this.wallGrid) return this.wallSegments;
+    const cx = Math.floor(x / this.wallCellSize);
+    const cz = Math.floor(z / this.wallCellSize);
+    const res = [];
+    const visited = new Set();
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        const list = this.wallGrid.get((cx + dx) + ',' + (cz + dz));
+        if (list) {
+          for (let i = 0; i < list.length; i++) {
+            const w = list[i];
+            if (!visited.has(w)) {
+              visited.add(w);
+              res.push(w);
+            }
+          }
+        }
+      }
+    }
+    return res.length > 0 ? res : this.wallSegments;
+  }
+
   async loadMap(mapId = 'cs16') {
     this.currentMapId = mapId;
     this.mapLoaded = false;
@@ -276,6 +330,7 @@ export class MapManager {
       // 3. Wall Segments for Circle-to-Line Continuous Collision
       if (data.wallSegments) {
         this.wallSegments = data.wallSegments;
+        this.buildWallGrid();
       }
 
       // 4. Colliders for 3D Prop & Box Collision
@@ -319,7 +374,7 @@ export class MapManager {
             c.castShadow = false;
 
             // Filter out blocklight shadow dummy meshes
-            if (c.name.includes('blocklight') || c.name.includes('shadow')) {
+            if (c.name.includes('blocklight') || c.name.includes('shadow') || c.name.includes('overlay')) {
               c.visible = false;
               return;
             }
@@ -327,7 +382,7 @@ export class MapManager {
             // Extract material tag from mesh name
             const m = c.name.match(/agg\d+_\d+_(.+?)(?:_\d+)?$/);
             const tag = m ? m[1].toLowerCase() : c.name.toLowerCase();
-            const texFile = textureMap[tag];
+            const texFile = textureMap[tag] || textureMap[tag.replace(/_fragment\d+/, '')] || textureMap[tag.replace(/_\d+$/, '')];
 
             if (texFile) {
               const tex = this.getCS2Texture(texFile);
@@ -487,8 +542,8 @@ export class MapManager {
 
   createBuyZoneDecals() {
     const isCS2 = this.currentMapId === 'cs2' || this.currentMapId === 'csgo';
-    const ctPos = isCS2 ? new THREE.Vector3(12.5, 0.3, -44.0) : new THREE.Vector3(10.0, 2.46, -44.0);
-    const tPos = isCS2 ? new THREE.Vector3(-20.0, 5.0, 19.5) : new THREE.Vector3(-18.0, 3.27, 21.0);
+    const ctPos = isCS2 ? new THREE.Vector3(58.0, -3.1, 6.0) : new THREE.Vector3(10.0, 2.46, -44.0);
+    const tPos = isCS2 ? new THREE.Vector3(-20.0, 3.4, -20.0) : new THREE.Vector3(-18.0, 3.27, 21.0);
 
     const ctGeo = new THREE.RingGeometry(3.5, 3.8, 32);
     const ctMat = new THREE.MeshBasicMaterial({
@@ -553,15 +608,21 @@ export class MapManager {
       return 0;
     }
 
-    let candidates = this.floorTriangles;
+    let candidates = [];
     if (this.floorGrid) {
       const cx = Math.floor(x / this.gridCellSize);
       const cz = Math.floor(z / this.gridCellSize);
-      const key = cx + ',' + cz;
-      const cellList = this.floorGrid.get(key);
-      if (cellList && cellList.length > 0) {
-        candidates = cellList;
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dz = -1; dz <= 1; dz++) {
+          const cellList = this.floorGrid.get((cx + dx) + ',' + (cz + dz));
+          if (cellList) {
+            for (let i = 0; i < cellList.length; i++) candidates.push(cellList[i]);
+          }
+        }
       }
+    }
+    if (candidates.length === 0) {
+      candidates = this.floorTriangles;
     }
 
     let bestY = -Infinity;
@@ -585,7 +646,7 @@ export class MapManager {
 
     if (bestY !== -Infinity) return bestY;
 
-    // 2. Seam & edge fallback: check nearby triangles with exact plane evaluation
+    // 2. Seam & edge fallback: check nearby candidate triangles with exact plane evaluation
     for (let i = 0; i < candidates.length; i++) {
       const f = candidates[i];
       if (x < f.minX - 0.5 || x > f.maxX + 0.5 || z < f.minZ - 0.5 || z > f.maxZ + 0.5) continue;
@@ -612,14 +673,14 @@ export class MapManager {
         y = -(f.nx * x + f.nz * z + f.d) / f.ny;
       }
 
-      if (y <= currentY && y > bestY) {
+      if (y <= currentY + 0.65 && y > bestY) {
         bestY = y;
       }
     }
 
     if (bestY !== -Infinity) return bestY;
 
-    // 4. Over open void: return -10.0 so gravity pulls player down naturally to safety net
+    // 4. Over open void
     return -10.0;
   }
 

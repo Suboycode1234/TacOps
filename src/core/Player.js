@@ -975,7 +975,7 @@ export class Player {
     const stepHeight = 0.45; // Obstacles below stepHeight are ground/stairs/ramps, NOT blocking walls
 
     // High-precision circle-to-segment collision with authentic BSP wall normals
-    const segments = this.mapManager ? this.mapManager.wallSegments : null;
+    const segments = this.mapManager ? (this.mapManager.getWallSegmentsNear ? this.mapManager.getWallSegmentsNear(pos.x, pos.z) : this.mapManager.wallSegments) : null;
     if (segments && segments.length > 0) {
       for (let i = 0; i < segments.length; i++) {
         const w = segments[i];
