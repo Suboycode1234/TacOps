@@ -1214,6 +1214,7 @@ body, html {
   border: 1px solid rgba(224, 169, 109, 0.4);
 }
 
+.map-badge.cs2,
 .map-badge.csgo {
   background: rgba(0, 180, 216, 0.2);
   color: #48cae4;

@@ -57,7 +57,10 @@ export class MapManager {
       const skyboxTexture = cubeLoader.load(
         ['desrt.png', 'deslf.png', 'desup.png', 'desdn.png', 'desbk.png', 'desft.png'],
         () => {
-          this.scene.background = skyboxTexture;
+          this.skyboxTexture = skyboxTexture;
+          if (this.currentMapId === 'cs16') {
+            this.scene.background = skyboxTexture;
+          }
         },
         undefined,
         (err) => {
@@ -148,8 +151,22 @@ export class MapManager {
     this.wallSegments = [];
     this.floorTriangles = [];
 
-    const mapJsonUrl = mapId === 'csgo'
-      ? '/models/Maps/Dust2/dust2_largo_csgo.json'
+    // Atmosphere & Skybox switching
+    if (mapId === 'cs2' || mapId === 'csgo') {
+      this.scene.background = new THREE.Color(0x6ca0dc); // Mediterranean CS2 clear blue daylight sky
+      this.scene.fog = new THREE.FogExp2(0x6ca0dc, 0.001);
+    } else {
+      if (this.skyboxTexture) {
+        this.scene.background = this.skyboxTexture;
+      } else {
+        this.scene.background = new THREE.Color(0xd6be96);
+      }
+      this.scene.fog = new THREE.FogExp2(0xd6be96, 0.0025);
+    }
+
+    const isCS2 = mapId === 'cs2' || mapId === 'csgo';
+    const mapJsonUrl = isCS2
+      ? '/models/Maps/Dust2/dust2_largo_cs2.json'
       : '/models/Maps/Dust2/dust2_largo.json';
 
     try {
@@ -262,7 +279,7 @@ export class MapManager {
       this.createBuyZoneDecals();
 
       this.mapLoaded = true;
-      console.log(`[MapManager] ${mapId === 'csgo' ? 'CS:GO Edition' : 'CS 1.6 Classic'} map loaded: ${Object.keys(meshesData).length} meshes, ${this.floorTriangles.length} floors, ${this.wallSegments.length} wall segments.`);
+      console.log(`[MapManager] ${(mapId === 'cs2' || mapId === 'csgo') ? 'CS2 Edition (Official .bin)' : 'CS 1.6 Classic'} map loaded: ${Object.keys(meshesData).length} meshes, ${this.floorTriangles.length} floors, ${this.wallSegments.length} wall segments.`);
 
       if (this.onMapLoaded) {
         this.onMapLoaded(mapId);
@@ -279,7 +296,7 @@ export class MapManager {
   }
 
   createShootingTargets() {
-    const targetPositions = this.currentMapId === 'csgo'
+    const targetPositions = (this.currentMapId === 'cs2' || this.currentMapId === 'csgo')
       ? [
           new THREE.Vector3(0, 0.45, 0),
           new THREE.Vector3(3.5, 0.45, 4.0),
@@ -366,7 +383,7 @@ export class MapManager {
       depthWrite: false,
       blending: THREE.AdditiveBlending,
     });
-    const isCSGO = this.currentMapId === 'csgo';
+    const isCSGO = (this.currentMapId === 'cs2' || this.currentMapId === 'csgo');
     const ctMesh = new THREE.Mesh(ctGeo, ctMat);
     ctMesh.rotation.x = -Math.PI / 2;
     ctMesh.position.set(isCSGO ? 4.5 : 10, isCSGO ? 0.46 : 2.46, isCSGO ? -4.5 : -44);
@@ -417,6 +434,13 @@ export class MapManager {
 
   // Calculate elevation / floor level at any coordinate (x, z)
   getGroundHeight(x, z, currentY = 0) {
+    if (this.currentMapId === 'cs2' || this.currentMapId === 'csgo') {
+      const b = this.mapBounds || { minX: -8.5, maxX: 8.5, minZ: -14.5, maxZ: 14.5 };
+      if (x >= b.minX - 0.5 && x <= b.maxX + 0.5 && z >= b.minZ - 0.5 && z <= b.maxZ + 0.5) {
+        return 0.4064; // Exact floor level of official CS2 .bin map
+      }
+    }
+
     if (!this.floorTriangles || this.floorTriangles.length === 0) {
       return 0;
     }

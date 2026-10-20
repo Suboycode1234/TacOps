@@ -86,6 +86,52 @@ const CT_ROUTES = [
   ]
 ];
 
+
+// Tactical Routes for CS2 Official .bin Map Arena
+const CS2_T_ROUTES = [
+  [
+    { pos: new THREE.Vector3(-4.5, 0.4064, 4.5), holdTime: 0.5 },
+    { pos: new THREE.Vector3(-2.0, 0.4064, 1.0), holdTime: 0.8 },
+    { pos: new THREE.Vector3(0.0, 0.4064, 0.0), holdTime: 1.0 },
+    { pos: new THREE.Vector3(3.0, 0.4064, -2.5), holdTime: 0.8 },
+    { pos: new THREE.Vector3(4.5, 0.4064, -4.5), holdTime: 1.2 }
+  ],
+  [
+    { pos: new THREE.Vector3(-5.5, 0.4064, 2.5), holdTime: 0.5 },
+    { pos: new THREE.Vector3(-4.0, 0.4064, -2.0), holdTime: 0.8 },
+    { pos: new THREE.Vector3(-1.0, 0.4064, -5.0), holdTime: 1.0 },
+    { pos: new THREE.Vector3(3.5, 0.4064, -4.0), holdTime: 1.2 }
+  ],
+  [
+    { pos: new THREE.Vector3(-3.0, 0.4064, 6.0), holdTime: 0.5 },
+    { pos: new THREE.Vector3(2.0, 0.4064, 5.0), holdTime: 0.8 },
+    { pos: new THREE.Vector3(4.0, 0.4064, 1.0), holdTime: 1.0 },
+    { pos: new THREE.Vector3(2.0, 0.4064, -3.5), holdTime: 1.2 }
+  ]
+];
+
+const CS2_CT_ROUTES = [
+  [
+    { pos: new THREE.Vector3(4.5, 0.4064, -4.5), holdTime: 0.5 },
+    { pos: new THREE.Vector3(2.0, 0.4064, -1.0), holdTime: 0.8 },
+    { pos: new THREE.Vector3(0.0, 0.4064, 0.0), holdTime: 1.0 },
+    { pos: new THREE.Vector3(-3.0, 0.4064, 2.5), holdTime: 0.8 },
+    { pos: new THREE.Vector3(-4.5, 0.4064, 4.5), holdTime: 1.2 }
+  ],
+  [
+    { pos: new THREE.Vector3(5.5, 0.4064, -2.5), holdTime: 0.5 },
+    { pos: new THREE.Vector3(4.0, 0.4064, 2.0), holdTime: 0.8 },
+    { pos: new THREE.Vector3(1.0, 0.4064, 5.0), holdTime: 1.0 },
+    { pos: new THREE.Vector3(-3.5, 0.4064, 4.0), holdTime: 1.2 }
+  ],
+  [
+    { pos: new THREE.Vector3(3.0, 0.4064, -6.0), holdTime: 0.5 },
+    { pos: new THREE.Vector3(-2.0, 0.4064, -5.0), holdTime: 0.8 },
+    { pos: new THREE.Vector3(-4.0, 0.4064, -1.0), holdTime: 1.0 },
+    { pos: new THREE.Vector3(-2.0, 0.4064, 3.5), holdTime: 1.2 }
+  ]
+];
+
 export class Bot {
   constructor(id, name, spawnPos, scene, mapManager, team = 'T', routeIdx = 0) {
     this.id = id;
@@ -137,7 +183,10 @@ export class Bot {
     this.holdLookTarget = null;
 
     // Tactical Multi-Route Navigation
-    const routePool = this.team === 'T' ? T_ROUTES : CT_ROUTES;
+    const isCS2 = this.mapManager && (this.mapManager.currentMapId === 'cs2' || this.mapManager.currentMapId === 'csgo');
+    const routePool = isCS2
+      ? (this.team === 'T' ? CS2_T_ROUTES : CS2_CT_ROUTES)
+      : (this.team === 'T' ? T_ROUTES : CT_ROUTES);
     this.route = routePool[routeIdx % routePool.length];
     this.routeDirection = 1; // 1 = forward, -1 = reverse
     this.currentWaypointIdx = 0;
