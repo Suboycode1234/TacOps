@@ -334,7 +334,12 @@ window.addEventListener('keydown', (e) => {
   }
   if (e.code === 'F2') {
     e.preventDefault();
-    selectMap(currentMap === 'cs16' ? 'cs2' : 'cs16');
+    selectMap('csgo');
+    return;
+  }
+  if (e.code === 'F3') {
+    e.preventDefault();
+    selectMap('cs2');
     return;
   }
 

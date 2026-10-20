@@ -58,7 +58,7 @@ export class MapManager {
     cubeLoader.setPath('/models/Maps/Dust2/skybox/');
     try {
       this.skyboxTexture = cubeLoader.load(
-        ['dust2_ft.png', 'dust2_bk.png', 'dust2_up.png', 'dust2_dn.png', 'dust2_rt.png', 'dust2_lf.png'],
+        ['desrt.png', 'deslf.png', 'desup.png', 'desdn.png', 'desft.png', 'desbk.png'],
         () => {
           if (this.currentMapId === 'cs16') {
             this.scene.background = this.skyboxTexture;
@@ -264,22 +264,25 @@ export class MapManager {
     this.floorGrid = null;
 
     // Atmosphere & Skybox switching
-    const isCS2 = mapId === 'cs2' || mapId === 'csgo';
-    if (isCS2) {
-      this.scene.background = new THREE.Color(0x6ca0dc); // Mediterranean CS2 clear daylight sky
-      this.scene.fog = new THREE.FogExp2(0x6ca0dc, 0.001);
-    } else {
+    let mapJsonUrl;
+    if (mapId === 'cs16') {
       if (this.skyboxTexture) {
         this.scene.background = this.skyboxTexture;
       } else {
         this.scene.background = new THREE.Color(0xbdddf4);
       }
-      this.scene.fog = new THREE.FogExp2(0xd6be96, 0.0025);
+      this.scene.fog = new THREE.FogExp2(0xd6be96, 0.0004);
+      mapJsonUrl = '/models/Maps/Dust2/dust2_largo.json';
+    } else if (mapId === 'csgo') {
+      this.scene.background = new THREE.Color(0x8ec1e8);
+      this.scene.fog = new THREE.FogExp2(0x8ec1e8, 0.0008);
+      mapJsonUrl = '/models/Maps/Dust2/dust2_largo_csgo.json';
+    } else {
+      // CS2 4K Remake
+      this.scene.background = new THREE.Color(0x6ca0dc);
+      this.scene.fog = new THREE.FogExp2(0x6ca0dc, 0.0006);
+      mapJsonUrl = '/models/Maps/Dust2/dust2_largo_cs2.json';
     }
-
-    const mapJsonUrl = isCS2
-      ? '/models/Maps/Dust2/dust2_largo_cs2.json'
-      : '/models/Maps/Dust2/dust2_largo.json';
 
     try {
       const res = await fetch(mapJsonUrl);
@@ -354,46 +357,97 @@ export class MapManager {
 
       // 5. Construct 3D Visual Geometry
       if (data.glbUrl) {
-        console.log('[MapManager] Loading official CS2 Source 2 visual world from: ' + data.glbUrl);
+        console.log('[MapManager] Loading visual world from: ' + data.glbUrl);
         const gltfLoader = new GLTFLoader();
         const gltf = await new Promise((resolve, reject) => {
           gltfLoader.load(data.glbUrl, resolve, undefined, reject);
         });
 
         const textureMap = data.textureMap || {};
-        const defaultMat = new THREE.MeshStandardMaterial({
-          color: 0xdfcbaf,
-          roughness: 0.85,
-          metalness: 0.05,
-          side: THREE.DoubleSide,
-        });
 
         gltf.scene.traverse((c) => {
           if (c.isMesh) {
             c.receiveShadow = true;
             c.castShadow = false;
 
-            // Filter out blocklight shadow dummy meshes
-            if (c.name.includes('blocklight') || c.name.includes('shadow') || c.name.includes('overlay')) {
+            const name = (c.name || '').toLowerCase();
+
+            // Filter out blocklight, shadow dummy meshes, overlay, and black occlusion volumes
+            if (
+              name.includes('blocklight') ||
+              name.includes('shadow') ||
+              name.includes('overlay') ||
+              name.includes('_black') ||
+              name.includes('toolsblack') ||
+              name.includes('nodraw')
+            ) {
               c.visible = false;
               return;
             }
 
             // Extract material tag from mesh name
+            let tag = name;
             const m = c.name.match(/agg\d+_\d+_(.+?)(?:_\d+)?$/);
-            const tag = m ? m[1].toLowerCase() : c.name.toLowerCase();
-            const texFile = textureMap[tag] || textureMap[tag.replace(/_fragment\d+/, '')] || textureMap[tag.replace(/_\d+$/, '')];
+            if (m) tag = m[1].toLowerCase();
+            else if (name.includes('nomerge')) tag = 'nomerge';
+
+            const cleanTag = tag.replace(/_fragment\d+/, '').replace(/_\d+$/, '');
+            const texFile = textureMap[tag] || textureMap[cleanTag] || textureMap[cleanTag.split('_')[0]];
+
+            // Physical material properties tailored to surface type
+            let roughness = 0.85;
+            let metalness = 0.05;
+            let fallbackColor = 0xd8c29d; // Sandstone plaster
+
+            if (/metal|iron|steel|corrugated|grate|vent|pipe|scaffold|can|barrel/.test(tag)) {
+              roughness = 0.4;
+              metalness = 0.75;
+              fallbackColor = 0x6e767d;
+            } else if (/car|vehicle|truck|van|trike|vespa/.test(tag)) {
+              roughness = 0.3;
+              metalness = 0.6;
+              fallbackColor = 0x8a3838;
+            } else if (/wood|plank|crate|plywood|timber|door/.test(tag)) {
+              roughness = 0.75;
+              metalness = 0.02;
+              fallbackColor = 0x855838;
+            } else if (/blacktop|tarmac|asphalt|road/.test(tag)) {
+              roughness = 0.9;
+              metalness = 0.1;
+              fallbackColor = 0x36383b;
+            } else if (/grass|weed|tree|branch|palm|flower|frond|foliage/.test(tag)) {
+              roughness = 0.6;
+              metalness = 0.0;
+              fallbackColor = 0x4f6e3c;
+            } else if (/awning|cloth|tarp|fabric/.test(tag)) {
+              roughness = 0.7;
+              metalness = 0.0;
+              fallbackColor = 0xa8483b;
+            } else if (/concrete/.test(tag)) {
+              roughness = 0.85;
+              metalness = 0.05;
+              fallbackColor = 0x9e978c;
+            } else if (/brick/.test(tag)) {
+              roughness = 0.9;
+              metalness = 0.02;
+              fallbackColor = 0x9c654f;
+            }
 
             if (texFile) {
               const tex = this.getCS2Texture(texFile);
               c.material = new THREE.MeshStandardMaterial({
                 map: tex,
-                roughness: 0.8,
-                metalness: 0.05,
+                roughness: roughness,
+                metalness: metalness,
                 side: THREE.DoubleSide,
               });
             } else {
-              c.material = defaultMat;
+              c.material = new THREE.MeshStandardMaterial({
+                color: fallbackColor,
+                roughness: roughness,
+                metalness: metalness,
+                side: THREE.DoubleSide,
+              });
             }
           }
         });

@@ -44,3 +44,6 @@ Tacops_standalone.html
 # Heavy 4K Remake Map (>100MB)
 public/models/Maps/Dust2/cs2_dust2_4k.glb
 
+
+# Bulk CS2 textures
+public/models/Maps/Dust2/textures_cs2/*.png
