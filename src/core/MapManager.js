@@ -114,7 +114,9 @@ export class MapManager {
         loaded.wrapS = THREE.RepeatWrapping;
         loaded.wrapT = THREE.RepeatWrapping;
         loaded.colorSpace = THREE.SRGBColorSpace;
-        loaded.anisotropy = 8;
+        loaded.anisotropy = 16;
+        loaded.generateMipmaps = true;
+        loaded.minFilter = THREE.LinearMipmapLinearFilter;
         loaded.needsUpdate = true;
       },
       undefined,
@@ -296,7 +298,7 @@ export class MapManager {
       // CS2 4K Remake
       this.scene.background = new THREE.Color(0x6ca0dc);
       this.scene.fog = new THREE.FogExp2(0x6ca0dc, 0.0006);
-      mapJsonUrl = '/models/Maps/Dust2/dust2_largo_cs2.json';
+      mapJsonUrl = '/models/Maps/Dust2/cs2_dust2_4k.json';
     }
 
     try {
@@ -435,7 +437,7 @@ export class MapManager {
             if (m) tag = m[1].toLowerCase();
             else if (name.includes('nomerge')) tag = 'nomerge';
 
-            const cleanTag = tag.replace(/_fragment\d+/, '').replace(/_\d+$/, '');
+            const cleanTag = tag.replace(/_fragment\d+/, '').replace(/_draw\d+/, '').replace(/_\d+$/, '');
             const texFile = textureMap[tag] || textureMap[cleanTag] || textureMap[cleanTag.split('_')[0]];
 
             // Physical material properties tailored to surface type
@@ -481,22 +483,19 @@ export class MapManager {
               fallbackColor = 0x9c654f;
             }
 
+            const hasVertexColors = !!(c.geometry && c.geometry.attributes.color);
+            const matConfig = {
+              roughness: roughness,
+              metalness: metalness,
+              side: side,
+              vertexColors: hasVertexColors
+            };
             if (texFile) {
-              const tex = this.getCS2Texture(texFile);
-              c.material = new THREE.MeshStandardMaterial({
-                map: tex,
-                roughness: roughness,
-                metalness: metalness,
-                side: side,
-              });
+              matConfig.map = this.getCS2Texture(texFile);
             } else {
-              c.material = new THREE.MeshStandardMaterial({
-                color: fallbackColor,
-                roughness: roughness,
-                metalness: metalness,
-                side: side,
-              });
+              matConfig.color = fallbackColor;
             }
+            c.material = new THREE.MeshStandardMaterial(matConfig);
           }
         });
 
